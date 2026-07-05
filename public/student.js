@@ -8,7 +8,6 @@ const rangeText = document.querySelector("#rangeText");
 const grid = document.querySelector("#problemGrid");
 const form = document.querySelector("#responseForm");
 const nameInput = document.querySelector("#studentName");
-const studentOptions = document.querySelector("#studentOptions");
 const checkedCount = document.querySelector("#checkedCount");
 const message = document.querySelector("#message");
 const photoInput = document.querySelector("#photoFiles");
@@ -110,7 +109,6 @@ async function loadAssignment() {
   document.title = assignment.title;
   document.body.dataset.theme = assignment.theme || "focus";
   classNameEl.textContent = assignment.className || "공통";
-  studentOptions.innerHTML = (assignment.students || []).map((name) => `<option value="${name}"></option>`).join("");
   title.textContent = `${displayDateLabel(assignment.dateLabel)} 과제`;
   rangeText.textContent = `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
   detail.textContent = assignment.detail || "질문할 문제를 모두 체크하고 이름을 입력해 주세요.";
