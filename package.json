@@ -1,0 +1,12 @@
+{
+  "name": "assignment-question-check",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check storage.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

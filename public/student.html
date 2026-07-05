@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>질문할 문제 체크</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell student-shell">
+      <section class="student-hero">
+        <div class="student-class-pill" id="className">반 확인 중</div>
+        <img class="hero-character" src="/assets/teacher-character.png" alt="" />
+        <div class="hero-copy">
+          <p class="eyebrow">질문 체크</p>
+          <h1 id="title">과제 불러오는 중</h1>
+          <p id="rangeText" class="range-text"></p>
+          <p id="detail" class="muted"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <form id="responseForm">
+          <label>
+            이름
+            <input id="studentName" list="studentOptions" placeholder="예: 홍길동" required />
+            <datalist id="studentOptions"></datalist>
+          </label>
+          <div class="section-head">
+            <h2>질문할 문제 체크</h2>
+            <span id="checkedCount" class="badge">0개 선택</span>
+          </div>
+          <div id="problemGrid" class="check-grid"></div>
+          <label class="photo-upload">
+            과제 사진 제출
+            <input id="photoFiles" type="file" accept="image/*" multiple />
+            <span class="muted">사진은 자동으로 작게 줄여서 저장됩니다.</span>
+          </label>
+          <div id="photoList" class="photo-list"></div>
+          <button class="primary full" type="submit">제출하기</button>
+          <p id="message" class="message"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="/student.js"></script>
+  </body>
+</html>

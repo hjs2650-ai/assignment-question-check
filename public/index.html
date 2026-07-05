@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>과제 질문 체크</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">선생님 화면</p>
+          <h1>과제 질문 체크</h1>
+        </div>
+        <button class="ghost" id="refreshButton">새로고침</button>
+      </section>
+
+      <section class="panel">
+        <h2>새 과제 만들기</h2>
+        <form id="assignmentForm" class="form-grid">
+          <label>
+            반 이름
+            <input name="className" list="classOptions" value="고1 제니트Z2" placeholder="예: 고1 제니트Z2" required />
+            <datalist id="classOptions"></datalist>
+          </label>
+          <label>
+            날짜
+            <input name="dateLabel" value="7/7" placeholder="예: 7/7" required />
+          </label>
+          <label>
+            교재명
+            <input name="book" value="고쟁이" placeholder="예: 고쟁이" required />
+          </label>
+          <label>
+            시작 번호
+            <input name="startNumber" type="number" min="1" value="1" required />
+          </label>
+          <label>
+            끝 번호
+            <input name="endNumber" type="number" min="1" value="100" required />
+          </label>
+          <label>
+            배경 테마
+            <select name="theme">
+              <option value="focus">집중</option>
+              <option value="fresh">산뜻</option>
+              <option value="paper">노트</option>
+              <option value="night">차분</option>
+            </select>
+          </label>
+          <label class="wide">
+            제목
+            <input name="title" value="7/7 과제 고쟁이 1번부터 100번까지" />
+          </label>
+          <label class="wide">
+            안내 내용
+            <textarea name="detail" rows="2" placeholder="학생에게 보일 안내를 적어 주세요.">질문할 문제를 모두 체크하고 이름을 입력해 주세요.</textarea>
+          </label>
+          <button class="primary" type="submit">과제 만들기</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>반별 고정 링크</h2>
+          <span id="classCount" class="badge">0개</span>
+        </div>
+        <div id="classList" class="class-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>과제 목록과 질문 집계</h2>
+          <span id="assignmentCount" class="badge">0개</span>
+        </div>
+        <div id="assignmentList" class="assignment-list"></div>
+      </section>
+    </main>
+
+    <template id="assignmentTemplate">
+      <article class="assignment">
+        <div class="assignment-head">
+          <div>
+            <p class="eyebrow class-name"></p>
+            <h3></h3>
+            <p class="muted"></p>
+          </div>
+          <div class="actions">
+            <button class="copy-class-link" type="button">반 링크 복사</button>
+            <button class="copy-link" type="button">이 과제 링크 복사</button>
+            <a class="student-link" target="_blank" rel="noreferrer">열기</a>
+          </div>
+        </div>
+        <div class="stats"></div>
+        <div class="problem-grid"></div>
+        <details>
+          <summary>학생별 제출 보기</summary>
+          <div class="responses"></div>
+        </details>
+      </article>
+    </template>
+
+    <script src="/teacher.js"></script>
+  </body>
+</html>

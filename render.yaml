@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: assignment-question-check
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: SHEETS_WEB_APP_URL
+        sync: false
+      - key: SHEETS_SECRET
+        sync: false
