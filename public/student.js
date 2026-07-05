@@ -109,9 +109,9 @@ async function loadAssignment() {
   document.title = assignment.title;
   document.body.dataset.theme = assignment.theme || "focus";
   classNameEl.textContent = assignment.className || "공통";
-  title.textContent = `${displayDateLabel(assignment.dateLabel)} 과제`;
+  title.textContent = `${displayDateLabel(assignment.dateLabel)} 과제 클리어`;
   rangeText.textContent = `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
-  detail.textContent = assignment.detail || "질문할 문제를 모두 체크하고 이름을 입력해 주세요.";
+  detail.textContent = "막힌 문제는 체크하고, 과제 사진은 첨부해 주세요.";
   renderProblems(assignment.problems);
 }
 
