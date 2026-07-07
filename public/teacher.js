@@ -28,6 +28,30 @@ function classUrl(className) {
   return `${location.origin}/class/${encodeURIComponent(className)}`;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function rangeLabel(assignment) {
+  if (assignment.rangeLabel) {
+    return assignment.rangeLabel;
+  }
+  return `${assignment.book} · ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
+}
+
+function itemMap(assignment) {
+  return Object.fromEntries((assignment.items || []).map((item) => [String(item.id), item]));
+}
+
+function problemLabel(assignment, problem) {
+  const item = itemMap(assignment)[String(problem)];
+  return item ? item.label : `${problem}번`;
+}
+
 async function copyToClipboard(text, button, label) {
   await navigator.clipboard.writeText(text);
   button.textContent = "복사됨";
@@ -87,7 +111,7 @@ function renderAssignments(assignments) {
     const node = template.content.firstElementChild.cloneNode(true);
     node.querySelector(".class-name").textContent = assignment.className || "공통";
     node.querySelector("h3").textContent = assignment.title;
-    node.querySelector(".muted").textContent = `${assignment.dateLabel} · ${assignment.book} · ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
+    node.querySelector(".muted").textContent = `${assignment.dateLabel} · ${rangeLabel(assignment)}`;
 
     const assignmentLink = studentUrl(assignment.id);
     const fixedClassLink = classUrl(assignment.className || "공통");
@@ -112,12 +136,13 @@ function renderAssignments(assignments) {
     `;
 
     const grid = node.querySelector(".problem-grid");
-    grid.innerHTML = assignment.problems
-      .map((problem) => {
-        const questionCount = assignment.counts[problem] || 0;
-        const names = assignment.studentsByProblem[problem] || [];
+    const items = assignment.items || assignment.problems.map((problem) => ({ id: String(problem), label: `${problem}번` }));
+    grid.innerHTML = items
+      .map((item) => {
+        const questionCount = assignment.counts[item.id] || 0;
+        const names = assignment.studentsByProblem[item.id] || [];
         const title = names.length ? `${names.join(", ")} 질문` : "질문 없음";
-        return `<div class="problem-cell ${questionCount > 0 ? "hot" : ""}" title="${title}">${problem}번 · ${questionCount}명</div>`;
+        return `<div class="problem-cell ${questionCount > 0 ? "hot" : ""}" title="${escapeHtml(title)}">${escapeHtml(item.label)} · ${questionCount}명</div>`;
       })
       .join("");
 
@@ -127,11 +152,11 @@ function renderAssignments(assignments) {
         ? `<p class="muted">아직 제출한 학생이 없습니다.</p>`
         : assignment.responses
             .map((response) => {
-              const problems = response.problems.length ? response.problems.map((number) => `${number}번`).join(", ") : "질문 없음";
+              const problems = response.problems.length ? response.problems.map((problem) => problemLabel(assignment, problem)).join(", ") : "질문 없음";
               const files = (response.files || []).length
                 ? ` · 사진 ${(response.files || []).map((file, index) => `<a href="${file.url}" target="_blank" rel="noreferrer">${index + 1}</a>`).join(", ")}`
                 : "";
-              return `<div class="response-row"><strong>${response.studentName}</strong><span>${problems}${files}</span></div>`;
+              return `<div class="response-row"><strong>${escapeHtml(response.studentName)}</strong><span>${escapeHtml(problems)}${files}</span></div>`;
             })
             .join("");
 

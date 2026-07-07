@@ -32,18 +32,53 @@ function updateCount() {
   checkedCount.textContent = `${count}개 선택`;
 }
 
-function renderProblems(problems) {
-  grid.innerHTML = problems
-    .map(
-      (problem) => `
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function itemLabel(item) {
+  return item && item.label ? item.label : `${item}번`;
+}
+
+function renderProblemCells(items) {
+  return items
+    .map((item) => {
+      const id = typeof item === "object" ? item.id : String(item);
+      const number = typeof item === "object" ? item.number : item;
+      return `
         <label class="check-cell">
-          <input type="checkbox" value="${problem}" />
-          <span>${problem}번</span>
+          <input type="checkbox" value="${escapeHtml(id)}" />
+          <span>${escapeHtml(number)}번</span>
         </label>
-      `,
-    )
+      `;
+    })
     .join("");
-  grid.addEventListener("change", updateCount);
+}
+
+function renderProblems(assignment) {
+  const items = Array.isArray(assignment.items) ? assignment.items : assignment.problems || [];
+  const books = Array.isArray(assignment.books) && assignment.books.length > 0 ? assignment.books : null;
+
+  if (!books || books.length === 1) {
+    grid.innerHTML = renderProblemCells(items);
+    return;
+  }
+
+  grid.innerHTML = books
+    .map((bookRange) => {
+      const rangeItems = items.filter((item) => item.book === bookRange.book && (bookRange.problems || []).includes(item.id));
+      return `
+        <section class="book-section">
+          <h3>${escapeHtml(bookRange.book)} ${escapeHtml(bookRange.startNumber)}번부터 ${escapeHtml(bookRange.endNumber)}번까지</h3>
+          <div class="check-grid">${renderProblemCells(rangeItems)}</div>
+        </section>
+      `;
+    })
+    .join("");
 }
 
 function displayDateLabel(dateLabel) {
@@ -110,15 +145,15 @@ async function loadAssignment() {
   document.body.dataset.theme = assignment.theme || "focus";
   classNameEl.textContent = assignment.className || "공통";
   title.textContent = `${displayDateLabel(assignment.dateLabel)} 과제 클리어`;
-  rangeText.textContent = `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
+  rangeText.textContent = assignment.rangeLabel || `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
   detail.textContent = "막힌 문제는 체크하고, 과제 사진은 첨부해 주세요.";
-  renderProblems(assignment.problems);
+  renderProblems(assignment);
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   message.textContent = "제출 중입니다. 사진이 있으면 잠시 기다려 주세요.";
-  const problems = [...grid.querySelectorAll("input:checked")].map((input) => Number(input.value));
+  const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
   const files = await selectedPhotosPayload();
   await api(`/api/assignments/${assignmentId}/responses`, {
     method: "POST",
@@ -134,6 +169,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 photoInput.addEventListener("change", renderSelectedPhotos);
+grid.addEventListener("change", updateCount);
 
 loadAssignment().catch((error) => {
   classNameEl.textContent = "확인 필요";

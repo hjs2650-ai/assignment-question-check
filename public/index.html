@@ -30,15 +30,15 @@
           </label>
           <label>
             교재명
-            <input name="book" value="고쟁이" placeholder="예: 고쟁이" required />
+            <input name="book" value="고쟁이" placeholder="예: 고쟁이" />
           </label>
           <label>
             시작 번호
-            <input name="startNumber" type="number" min="1" value="1" required />
+            <input name="startNumber" type="number" min="1" value="1" />
           </label>
           <label>
             끝 번호
-            <input name="endNumber" type="number" min="1" value="100" required />
+            <input name="endNumber" type="number" min="1" value="100" />
           </label>
           <label>
             배경 테마
@@ -48,6 +48,10 @@
               <option value="paper">노트</option>
               <option value="night">차분</option>
             </select>
+          </label>
+          <label class="wide">
+            여러 교재 입력
+            <textarea name="bookRanges" rows="3" placeholder="예: 고쟁이 1~40&#10;쎈 50~84"></textarea>
           </label>
           <label class="wide">
             제목

@@ -305,6 +305,18 @@ button,
   gap: 8px;
 }
 
+.book-section {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.book-section h3 {
+  margin: 10px 0 0;
+  font-size: 18px;
+}
+
 .problem-cell,
 .check-cell {
   min-height: 46px;
