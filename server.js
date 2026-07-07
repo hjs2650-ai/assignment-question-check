@@ -58,6 +58,109 @@ function makeProblemList(start, end) {
   return Array.from({ length: last - first + 1 }, (_, index) => first + index);
 }
 
+function problemId(book, number) {
+  return `${book}__${number}`;
+}
+
+function parseBookRanges(text) {
+  return normalizeText(text)
+    .split(/\r?\n|,/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^(.+?)\s+(\d+)\s*번?\s*(?:~|-|부터)\s*(\d+)\s*번?\s*(?:까지)?$/);
+      if (!match) {
+        return null;
+      }
+      return {
+        book: normalizeText(match[1]),
+        startNumber: Number(match[2]),
+        endNumber: Number(match[3]),
+      };
+    });
+}
+
+function normalizeBookRanges(body) {
+  const rawBooks = Array.isArray(body.books) ? body.books : parseBookRanges(body.bookRanges);
+  const ranges = rawBooks
+    .map((item) => ({
+      book: normalizeText(item && item.book),
+      startNumber: Number(item && item.startNumber),
+      endNumber: Number(item && item.endNumber),
+    }))
+    .filter((item) => item.book && makeProblemList(item.startNumber, item.endNumber));
+
+  if (ranges.length > 0) {
+    return ranges.map((item) => {
+      const numbers = makeProblemList(item.startNumber, item.endNumber);
+      return {
+        book: item.book,
+        startNumber: item.startNumber,
+        endNumber: item.endNumber,
+        problems: numbers.map((number) => problemId(item.book, number)),
+      };
+    });
+  }
+
+  const book = normalizeText(body.book);
+  const numbers = makeProblemList(body.startNumber, body.endNumber);
+  if (!book || !numbers) {
+    return null;
+  }
+  return [
+    {
+      book,
+      startNumber: Number(body.startNumber),
+      endNumber: Number(body.endNumber),
+      problems: numbers.map(String),
+    },
+  ];
+}
+
+function booksForAssignment(assignment) {
+  if (Array.isArray(assignment.books) && assignment.books.length > 0) {
+    return assignment.books.map((range) => ({
+      book: normalizeText(range.book || assignment.book),
+      startNumber: Number(range.startNumber),
+      endNumber: Number(range.endNumber),
+      problems: Array.isArray(range.problems) ? range.problems.map(String) : makeProblemList(range.startNumber, range.endNumber).map((number) => problemId(range.book, number)),
+    }));
+  }
+
+  const problems = Array.isArray(assignment.problems) ? assignment.problems.map(String) : [];
+  return [
+    {
+      book: normalizeText(assignment.book),
+      startNumber: problems[0],
+      endNumber: problems[problems.length - 1],
+      problems,
+    },
+  ];
+}
+
+function itemsForAssignment(assignment) {
+  return booksForAssignment(assignment).flatMap((range) =>
+    range.problems.map((id) => {
+      const text = String(id);
+      const suffix = text.startsWith(`${range.book}__`) ? text.slice(`${range.book}__`.length) : text;
+      const number = Number(suffix);
+      const labelNumber = Number.isFinite(number) ? number : suffix;
+      return {
+        id: text,
+        book: range.book,
+        number: labelNumber,
+        label: `${range.book} ${labelNumber}번`,
+      };
+    }),
+  );
+}
+
+function assignmentBookLabel(assignment) {
+  return booksForAssignment(assignment)
+    .map((range) => `${range.book} ${range.startNumber}번부터 ${range.endNumber}번까지`)
+    .join(", ");
+}
+
 function normalizeData(data) {
   if (!data || !Array.isArray(data.assignments)) {
     return { assignments: [], classes: [] };
@@ -69,14 +172,17 @@ function normalizeData(data) {
   });
   data.assignments.forEach((assignment) => {
     assignment.className = normalizeClassName(assignment.className);
+    assignment.books = booksForAssignment(assignment);
+    assignment.problems = assignment.books.flatMap((range) => range.problems).map(String);
+    assignment.book = assignment.books.map((range) => range.book).join(", ");
     assignment.responses = Array.isArray(assignment.responses) ? assignment.responses : [];
     assignment.responses.forEach((response) => {
       if (!Array.isArray(response.problems)) {
         response.problems = String(response.problems || "")
           .split(/[\s,]+/)
-          .map(Number)
-          .filter((number) => Number.isInteger(number));
+          .filter(Boolean);
       }
+      response.problems = response.problems.map(String);
       response.files = Array.isArray(response.files) ? response.files : [];
     });
   });
@@ -90,9 +196,12 @@ function publicAssignment(assignment) {
     theme: assignment.theme || "focus",
     dateLabel: assignment.dateLabel,
     book: assignment.book,
+    books: booksForAssignment(assignment),
     title: assignment.title,
     detail: assignment.detail,
     problems: assignment.problems,
+    items: itemsForAssignment(assignment),
+    rangeLabel: assignmentBookLabel(assignment),
     createdAt: assignment.createdAt,
   };
 }
@@ -104,8 +213,9 @@ function studentsForClass(data, className) {
 }
 
 function summaryFor(assignment) {
-  const counts = Object.fromEntries(assignment.problems.map((problem) => [problem, 0]));
-  const studentsByProblem = Object.fromEntries(assignment.problems.map((problem) => [problem, []]));
+  const validProblems = assignment.problems.map(String);
+  const counts = Object.fromEntries(validProblems.map((problem) => [problem, 0]));
+  const studentsByProblem = Object.fromEntries(validProblems.map((problem) => [problem, []]));
 
   for (const response of assignment.responses || []) {
     for (const problem of response.problems || []) {
@@ -199,10 +309,11 @@ async function handleApi(req, res, pathname) {
     const className = normalizeClassName(body.className);
     const theme = normalizeText(body.theme) || "focus";
     const dateLabel = normalizeText(body.dateLabel);
-    const book = normalizeText(body.book);
+    const books = normalizeBookRanges(body);
+    const book = books ? books.map((range) => range.book).join(", ") : "";
     const title = normalizeText(body.title) || `${dateLabel} 과제 ${book}`.trim();
     const detail = normalizeText(body.detail);
-    const problems = makeProblemList(body.startNumber, body.endNumber);
+    const problems = books ? books.flatMap((range) => range.problems).map(String) : null;
 
     if (!dateLabel || !book || !problems) {
       sendJson(res, 400, { error: "날짜, 교재명, 문제 범위를 확인해 주세요." });
@@ -215,6 +326,7 @@ async function handleApi(req, res, pathname) {
       theme,
       dateLabel,
       book,
+      books,
       title,
       detail,
       problems,
@@ -252,10 +364,10 @@ async function handleApi(req, res, pathname) {
 
     const body = await readBody(req);
     const studentName = normalizeText(body.studentName);
-    const checked = Array.isArray(body.problems) ? body.problems.map(Number) : [];
+    const checked = Array.isArray(body.problems) ? body.problems.map(String) : [];
     const submittedFiles = Array.isArray(body.files) ? body.files : [];
     const validSet = new Set(assignment.problems);
-    const problems = [...new Set(checked)].filter((problem) => validSet.has(problem)).sort((a, b) => a - b);
+    const problems = [...new Set(checked)].filter((problem) => validSet.has(problem));
 
     if (!studentName) {
       sendJson(res, 400, { error: "이름을 입력해 주세요." });
