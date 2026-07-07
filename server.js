@@ -374,10 +374,14 @@ async function handleApi(req, res, pathname) {
       return;
     }
 
-    const filesToUpload = submittedFiles
-      .filter((file) => file && /^image\/(jpeg|png|webp)$/.test(file.mimeType) && file.base64)
-      .slice(0, 8);
-    const uploadedFiles = filesToUpload.length ? await store.uploadFiles(assignment, studentName, filesToUpload) : [];
+    const uploadedFiles = submittedFiles
+      .filter((file) => file && /^image\/(jpeg|png|webp)$/.test(file.mimeType))
+      .slice(0, 8)
+      .map((file) => ({
+        name: normalizeText(file.name) || "photo",
+        stored: false,
+        createdAt: new Date().toISOString(),
+      }));
 
     const existing = assignment.responses.find((response) => response.studentName === studentName);
     if (existing) {
