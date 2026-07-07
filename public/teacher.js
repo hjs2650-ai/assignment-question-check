@@ -131,7 +131,7 @@ function renderAssignments(assignments) {
     const totalQuestions = Object.values(assignment.counts).reduce((sum, value) => sum + value, 0);
     stats.innerHTML = `
       <span class="stat">제출 ${assignment.responseCount}명</span>
-      <span class="stat">질문 체크 ${totalQuestions}개</span>
+      <span class="stat">도와줘요 쌤 ${totalQuestions}개</span>
       <span class="stat">문항 ${assignment.problems.length}개</span>
     `;
 
@@ -154,7 +154,7 @@ function renderAssignments(assignments) {
             .map((response) => {
               const problems = response.problems.length ? response.problems.map((problem) => problemLabel(assignment, problem)).join(", ") : "질문 없음";
               const files = (response.files || []).length
-                ? ` · 사진 ${(response.files || []).map((file, index) => `<a href="${file.url}" target="_blank" rel="noreferrer">${index + 1}</a>`).join(", ")}`
+                ? ` · 사진 첨부함`
                 : "";
               return `<div class="response-row"><strong>${escapeHtml(response.studentName)}</strong><span>${escapeHtml(problems)}${files}</span></div>`;
             })

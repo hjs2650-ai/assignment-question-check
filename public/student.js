@@ -92,46 +92,12 @@ function renderSelectedPhotos() {
     : "";
 }
 
-function fileToImage(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = reject;
-      image.src = reader.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-async function compressPhoto(file) {
-  const image = await fileToImage(file);
-  const maxSide = 1600;
-  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  context.drawImage(image, 0, 0, width, height);
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
-  return {
-    name: file.name.replace(/\.[^.]+$/, "") + ".jpg",
-    mimeType: "image/jpeg",
-    base64: dataUrl.split(",")[1],
-  };
-}
-
 async function selectedPhotosPayload() {
   const files = [...photoInput.files].filter((file) => file.type.startsWith("image/")).slice(0, 8);
-  const compressed = [];
-  for (const file of files) {
-    compressed.push(await compressPhoto(file));
-  }
-  return compressed;
+  return files.map((file) => ({
+    name: file.name,
+    mimeType: file.type || "image/jpeg",
+  }));
 }
 
 async function loadAssignment() {
@@ -146,13 +112,13 @@ async function loadAssignment() {
   classNameEl.textContent = assignment.className || "공통";
   title.textContent = `${displayDateLabel(assignment.dateLabel)} 과제 클리어`;
   rangeText.textContent = assignment.rangeLabel || `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
-  detail.textContent = "막힌 문제는 체크하고, 과제 사진은 첨부해 주세요.";
+  detail.textContent = "도와줘요 쌤 문제를 체크하고, 과제 사진은 첨부해 주세요.";
   renderProblems(assignment);
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  message.textContent = "제출 중입니다. 사진이 있으면 잠시 기다려 주세요.";
+  message.textContent = "제출 중입니다.";
   const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
   const files = await selectedPhotosPayload();
   await api(`/api/assignments/${assignmentId}/responses`, {
@@ -165,7 +131,7 @@ form.addEventListener("submit", async (event) => {
   });
   photoInput.value = "";
   renderSelectedPhotos();
-  message.textContent = "제출되었습니다. 같은 이름으로 다시 제출하면 문제 체크는 수정되고 사진은 추가 저장됩니다.";
+  message.textContent = "제출되었습니다. 같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.";
 });
 
 photoInput.addEventListener("change", renderSelectedPhotos);
