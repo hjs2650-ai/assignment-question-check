@@ -294,12 +294,31 @@ async function handleApi(req, res, pathname) {
     return;
   }
 
+  const classAssignmentsMatch = pathname.match(/^\/api\/classes\/([^/]+)\/assignments$/);
+  if (req.method === "GET" && classAssignmentsMatch) {
+    const className = decodeURIComponent(classAssignmentsMatch[1]);
+    const targetClass = normalizeClassName(className);
+    const assignments = data.assignments
+      .filter((assignment) => normalizeClassName(assignment.className) === targetClass)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(publicAssignment);
+    sendJson(res, 200, {
+      assignments,
+      students: studentsForClass(data, className),
+    });
+    return;
+  }
+
   if (req.method === "GET" && pathname === "/api/assignments") {
     sendJson(res, 200, {
       assignments: data.assignments
         .slice()
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .map(summaryFor),
+        .map((assignment) => ({
+          ...summaryFor(assignment),
+          students: studentsForClass(data, assignment.className),
+        })),
     });
     return;
   }
@@ -364,7 +383,8 @@ async function handleApi(req, res, pathname) {
 
     const body = await readBody(req);
     const studentName = normalizeText(body.studentName);
-    const checked = Array.isArray(body.problems) ? body.problems.map(String) : [];
+    const hasProblemPayload = Array.isArray(body.problems);
+    const checked = hasProblemPayload ? body.problems.map(String) : [];
     const submittedFiles = Array.isArray(body.files) ? body.files : [];
     const validSet = new Set(assignment.problems);
     const problems = [...new Set(checked)].filter((problem) => validSet.has(problem));
@@ -385,7 +405,9 @@ async function handleApi(req, res, pathname) {
 
     const existing = assignment.responses.find((response) => response.studentName === studentName);
     if (existing) {
-      existing.problems = problems;
+      if (hasProblemPayload && !body.keepProblems) {
+        existing.problems = problems;
+      }
       existing.files = [...(existing.files || []), ...uploadedFiles];
       existing.updatedAt = new Date().toISOString();
     } else {

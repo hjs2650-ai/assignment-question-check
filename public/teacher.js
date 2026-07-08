@@ -53,6 +53,22 @@ function problemLabel(assignment, problem) {
   return item ? item.label : `${problem}번`;
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return "시간 없음";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "시간 없음";
+  }
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function classOrderIndex(className) {
   const index = fixedClassOrder.indexOf(className || "공통");
   return index === -1 ? fixedClassOrder.length : index;
@@ -74,6 +90,38 @@ async function copyToClipboard(text, button, label) {
   setTimeout(() => {
     button.textContent = label;
   }, 1200);
+}
+
+function submittedNames(assignment) {
+  return new Set((assignment.responses || []).map((response) => response.studentName));
+}
+
+function missingStudents(assignment) {
+  const students = Array.isArray(assignment.students) ? assignment.students : [];
+  const submitted = submittedNames(assignment);
+  return students.filter((student) => !submitted.has(student));
+}
+
+function submissionRateText(assignment) {
+  const total = Array.isArray(assignment.students) ? assignment.students.length : 0;
+  if (!total) {
+    return `제출 ${assignment.responseCount}명`;
+  }
+  const submitted = [...submittedNames(assignment)].filter((name) => assignment.students.includes(name)).length;
+  const percent = Math.round((submitted / total) * 100);
+  return `제출 ${submitted}/${total}명 (${percent}%)`;
+}
+
+function topHelpProblems(assignment) {
+  return (assignment.items || [])
+    .map((item) => ({
+      label: item.label,
+      count: assignment.counts[item.id] || 0,
+      names: assignment.studentsByProblem[item.id] || [],
+    }))
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ko"))
+    .slice(0, 5);
 }
 
 function renderClasses(assignments) {
@@ -145,10 +193,32 @@ function renderAssignments(assignments) {
     const stats = node.querySelector(".stats");
     const totalQuestions = Object.values(assignment.counts).reduce((sum, value) => sum + value, 0);
     stats.innerHTML = `
-      <span class="stat">제출 ${assignment.responseCount}명</span>
+      <span class="stat">${submissionRateText(assignment)}</span>
       <span class="stat">도와줘요 쌤 ${totalQuestions}개</span>
       <span class="stat">문항 ${assignment.problems.length}개</span>
     `;
+
+    const missing = missingStudents(assignment);
+    const topItems = topHelpProblems(assignment);
+    stats.insertAdjacentHTML(
+      "afterend",
+      `
+        <div class="teacher-insights">
+          <section>
+            <h4>미제출 학생</h4>
+            <p>${missing.length ? escapeHtml(missing.join(", ")) : "없음"}</p>
+          </section>
+          <section>
+            <h4>도와줘요 쌤 TOP 5</h4>
+            <p>${
+              topItems.length
+                ? topItems.map((item) => `${escapeHtml(item.label)} ${item.count}명`).join(" · ")
+                : "아직 없음"
+            }</p>
+          </section>
+        </div>
+      `,
+    );
 
     const grid = node.querySelector(".problem-grid");
     const items = assignment.items || assignment.problems.map((problem) => ({ id: String(problem), label: `${problem}번` }));
@@ -171,7 +241,7 @@ function renderAssignments(assignments) {
               const files = (response.files || []).length
                 ? ` · 사진 첨부함`
                 : "";
-              return `<div class="response-row"><strong>${escapeHtml(response.studentName)}</strong><span>${escapeHtml(problems)}${files}</span></div>`;
+              return `<div class="response-row"><strong>${escapeHtml(response.studentName)}</strong><span>${escapeHtml(problems)}${files}</span><em>${escapeHtml(formatDateTime(response.updatedAt))}</em></div>`;
             })
             .join("");
 

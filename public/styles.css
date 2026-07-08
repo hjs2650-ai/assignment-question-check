@@ -205,6 +205,20 @@ button,
   background: var(--primary-dark);
 }
 
+.secondary {
+  background: #e9f8f4;
+  color: var(--accent);
+}
+
+.secondary:hover {
+  background: #d7f0ea;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .ghost,
 .copy-link,
 .copy-class-link,
@@ -225,6 +239,15 @@ button,
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.section-head.compact {
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.section-head.compact h2 {
+  margin-bottom: 0;
 }
 
 .badge {
@@ -296,6 +319,31 @@ button,
   padding: 9px 12px;
   background: #fafcff;
   font-weight: 800;
+}
+
+.teacher-insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.teacher-insights section {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  background: #fafcff;
+}
+
+.teacher-insights h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.teacher-insights p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .problem-grid,
@@ -371,11 +419,19 @@ summary {
 }
 
 .response-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(90px, 0.7fr) minmax(160px, 2fr) minmax(92px, auto);
+  align-items: center;
   gap: 10px;
   padding: 9px 0;
   border-bottom: 1px solid #edf1f7;
+}
+
+.response-row em {
+  color: var(--muted);
+  font-style: normal;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .message {
@@ -385,8 +441,44 @@ summary {
   font-weight: 800;
 }
 
+.message.error {
+  color: var(--danger);
+}
+
+.message.success {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(15, 143, 122, 0.24);
+  border-radius: 8px;
+  padding: 14px;
+  background: #e9f8f4;
+}
+
+.message.success strong {
+  font-size: 18px;
+}
+
+.message.success span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .photo-upload {
   margin-top: 16px;
+}
+
+.past-assignment-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid rgba(15, 143, 122, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(233, 248, 244, 0.86), rgba(248, 251, 255, 0.92));
+}
+
+.past-assignment-panel[hidden] {
+  display: none;
 }
 
 .photo-list {
@@ -585,6 +677,16 @@ body[data-theme="night"] .range-text {
 
   .form-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .teacher-insights,
+  .submission-options,
+  .response-row {
+    grid-template-columns: 1fr;
+  }
+
+  .response-row em {
+    text-align: left;
   }
 
   .primary {

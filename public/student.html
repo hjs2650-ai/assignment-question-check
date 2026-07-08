@@ -45,6 +45,25 @@
           <div id="photoList" class="photo-list"></div>
           <button class="primary full" type="submit">제출하기</button>
           <p id="message" class="message"></p>
+
+          <section id="pastAssignmentWrap" class="past-assignment-panel">
+            <div class="section-head compact">
+              <h2>지난과제 제출</h2>
+              <span class="badge">늦은 제출</span>
+            </div>
+            <label>
+              제출할 과제
+              <select id="pastAssignmentSelect"></select>
+            </label>
+            <label class="photo-upload">
+              지난과제 사진 첨부
+              <input id="pastPhotoFiles" type="file" accept="image/*" multiple />
+              <span class="muted">선택한 날짜의 과제 제출로 기록됩니다.</span>
+            </label>
+            <div id="pastPhotoList" class="photo-list"></div>
+            <button id="pastSubmitBtn" class="secondary full" type="button">지난과제 제출하기</button>
+            <p id="pastMessage" class="message"></p>
+          </section>
         </form>
       </section>
     </main>
