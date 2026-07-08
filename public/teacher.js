@@ -6,7 +6,7 @@ const classCountBadge = document.querySelector("#classCount");
 const refreshButton = document.querySelector("#refreshButton");
 const template = document.querySelector("#assignmentTemplate");
 const classOptions = document.querySelector("#classOptions");
-const defaultClasses = ["고1 제니트", "고1 1티어", "고1 SKY"];
+const defaultClasses = [];
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -61,7 +61,7 @@ async function copyToClipboard(text, button, label) {
 }
 
 function renderClasses(assignments) {
-  const classes = [...new Set([...defaultClasses, "고1 제니트Z2", ...assignments.map((assignment) => assignment.className || "공통")])].sort(
+  const classes = [...new Set([...defaultClasses, ...assignments.map((assignment) => assignment.className || "공통")])].sort(
     (a, b) => a.localeCompare(b, "ko"),
   );
   classCountBadge.textContent = `${classes.length}개`;
