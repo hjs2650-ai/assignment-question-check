@@ -7,6 +7,7 @@ const refreshButton = document.querySelector("#refreshButton");
 const template = document.querySelector("#assignmentTemplate");
 const classOptions = document.querySelector("#classOptions");
 const defaultClasses = [];
+const fixedClassOrder = ["고1 1티어D3", "고1 제니트Z2", "고1 SKYA3"];
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -52,6 +53,21 @@ function problemLabel(assignment, problem) {
   return item ? item.label : `${problem}번`;
 }
 
+function classOrderIndex(className) {
+  const index = fixedClassOrder.indexOf(className || "공통");
+  return index === -1 ? fixedClassOrder.length : index;
+}
+
+function compareByClassOrder(a, b) {
+  const classA = typeof a === "string" ? a : a.className || "공통";
+  const classB = typeof b === "string" ? b : b.className || "공통";
+  const orderDiff = classOrderIndex(classA) - classOrderIndex(classB);
+  if (orderDiff !== 0) {
+    return orderDiff;
+  }
+  return classA.localeCompare(classB, "ko");
+}
+
 async function copyToClipboard(text, button, label) {
   await navigator.clipboard.writeText(text);
   button.textContent = "복사됨";
@@ -61,9 +77,7 @@ async function copyToClipboard(text, button, label) {
 }
 
 function renderClasses(assignments) {
-  const classes = [...new Set([...defaultClasses, ...assignments.map((assignment) => assignment.className || "공통")])].sort(
-    (a, b) => a.localeCompare(b, "ko"),
-  );
+  const classes = [...new Set([...defaultClasses, ...assignments.map((assignment) => assignment.className || "공통")])].sort(compareByClassOrder);
   classCountBadge.textContent = `${classes.length}개`;
   classOptions.innerHTML = classes.map((name) => `<option value="${name}"></option>`).join("");
 
@@ -98,16 +112,17 @@ function renderClasses(assignments) {
 }
 
 function renderAssignments(assignments) {
-  countBadge.textContent = `${assignments.length}개`;
+  const orderedAssignments = assignments.slice().sort((a, b) => compareByClassOrder(a, b) || b.createdAt.localeCompare(a.createdAt));
+  countBadge.textContent = `${orderedAssignments.length}개`;
   list.innerHTML = "";
-  renderClasses(assignments);
+  renderClasses(orderedAssignments);
 
-  if (assignments.length === 0) {
+  if (orderedAssignments.length === 0) {
     list.innerHTML = `<p class="muted">아직 만든 과제가 없습니다.</p>`;
     return;
   }
 
-  for (const assignment of assignments) {
+  for (const assignment of orderedAssignments) {
     const node = template.content.firstElementChild.cloneNode(true);
     node.querySelector(".class-name").textContent = assignment.className || "공통";
     node.querySelector("h3").textContent = assignment.title;
