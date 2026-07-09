@@ -223,6 +223,7 @@ button:disabled {
 .copy-link,
 .copy-class-link,
 .copy-fixed-class,
+.copy-summary,
 .student-link {
   background: var(--soft);
   color: var(--primary);
@@ -270,7 +271,7 @@ button:disabled {
 
 .assignment-list {
   display: grid;
-  gap: 14px;
+  gap: 18px;
 }
 
 .class-list {
@@ -297,6 +298,46 @@ button:disabled {
 
 .assignment {
   padding: 18px;
+}
+
+.class-assignment-group {
+  display: grid;
+  gap: 10px;
+}
+
+.latest-assignment-card {
+  border-color: rgba(35, 100, 210, 0.2);
+}
+
+.past-assignment-list {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.past-assignment-list > summary {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 12px;
+  background: #fafcff;
+  color: var(--primary);
+}
+
+.past-assignment-items {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.past-assignment-card {
+  box-shadow: none;
+  background: #fbfcff;
+}
+
+.no-past {
+  margin: 0 0 0 2px;
 }
 
 .actions {
@@ -405,6 +446,38 @@ details {
   margin-top: 14px;
   border-top: 1px solid var(--line);
   padding-top: 12px;
+}
+
+.create-assignment {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.create-assignment > summary {
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: var(--soft);
+  color: var(--primary);
+}
+
+.create-assignment .form-grid {
+  margin-top: 16px;
+}
+
+.assignment-detail > summary {
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 12px;
+  background: #fafcff;
+  color: var(--primary);
+}
+
+.assignment-detail[open] > summary {
+  margin-bottom: 12px;
 }
 
 summary {

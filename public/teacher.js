@@ -8,6 +8,7 @@ const template = document.querySelector("#assignmentTemplate");
 const classOptions = document.querySelector("#classOptions");
 const defaultClasses = [];
 const fixedClassOrder = ["고1 1티어D3", "고1 제니트Z2", "고1 SKYA3"];
+let latestAssignments = [];
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -85,7 +86,19 @@ function compareByClassOrder(a, b) {
 }
 
 async function copyToClipboard(text, button, label) {
-  await navigator.clipboard.writeText(text);
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+  }
   button.textContent = "복사됨";
   setTimeout(() => {
     button.textContent = label;
@@ -122,6 +135,148 @@ function topHelpProblems(assignment) {
     .filter((item) => item.count > 0)
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ko"))
     .slice(0, 5);
+}
+
+function totalQuestionCount(assignment) {
+  return Object.values(assignment.counts || {}).reduce((sum, value) => sum + value, 0);
+}
+
+function groupedByClass(assignments) {
+  const groups = new Map();
+  assignments.forEach((assignment) => {
+    const className = assignment.className || "공통";
+    if (!groups.has(className)) {
+      groups.set(className, []);
+    }
+    groups.get(className).push(assignment);
+  });
+  return [...groups.entries()]
+    .map(([className, items]) => ({
+      className,
+      assignments: items.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    }))
+    .sort((a, b) => compareByClassOrder(a.className, b.className));
+}
+
+function responseSummary(assignment) {
+  const rows = (assignment.responses || []).map((response) => {
+    const problems = response.problems.length
+      ? response.problems.map((problem) => problemLabel(assignment, problem)).join(", ")
+      : "질문 없음";
+    const files = (response.files || []).length ? " · 사진 첨부" : "";
+    return `${response.studentName}: ${problems}${files}`;
+  });
+  return rows.length ? rows.join("\n") : "아직 제출한 학생 없음";
+}
+
+function lessonSummaryText(assignment) {
+  const missing = missingStudents(assignment);
+  const topItems = topHelpProblems(assignment);
+  return [
+    `[${assignment.className || "공통"} ${assignment.title}]`,
+    `${assignment.dateLabel} · ${rangeLabel(assignment)}`,
+    "",
+    `제출: ${submissionRateText(assignment)}`,
+    `미제출: ${missing.length ? missing.join(", ") : "없음"}`,
+    `도와줘요 쌤 TOP 5: ${topItems.length ? topItems.map((item) => `${item.label} ${item.count}명`).join(", ") : "아직 없음"}`,
+    "",
+    "[학생별 제출]",
+    responseSummary(assignment),
+  ].join("\n");
+}
+
+function assignmentStatsHtml(assignment) {
+  return `
+    <span class="stat">${submissionRateText(assignment)}</span>
+    <span class="stat">도와줘요 쌤 ${totalQuestionCount(assignment)}개</span>
+    <span class="stat">문항 ${assignment.problems.length}개</span>
+  `;
+}
+
+function assignmentInsightsHtml(assignment) {
+  const missing = missingStudents(assignment);
+  const topItems = topHelpProblems(assignment);
+  return `
+    <div class="teacher-insights">
+      <section>
+        <h4>미제출 학생</h4>
+        <p>${missing.length ? escapeHtml(missing.join(", ")) : "없음"}</p>
+      </section>
+      <section>
+        <h4>도와줘요 쌤 TOP 5</h4>
+        <p>${
+          topItems.length
+            ? topItems.map((item) => `${escapeHtml(item.label)} ${item.count}명`).join(" · ")
+            : "아직 없음"
+        }</p>
+      </section>
+    </div>
+  `;
+}
+
+function problemGridHtml(assignment) {
+  const items = assignment.items || assignment.problems.map((problem) => ({ id: String(problem), label: `${problem}번` }));
+  return items
+    .map((item) => {
+      const questionCount = assignment.counts[item.id] || 0;
+      const names = assignment.studentsByProblem[item.id] || [];
+      const title = names.length ? `${names.join(", ")} 질문` : "질문 없음";
+      return `<div class="problem-cell ${questionCount > 0 ? "hot" : ""}" title="${escapeHtml(title)}">${escapeHtml(item.label)} · ${questionCount}명</div>`;
+    })
+    .join("");
+}
+
+function responsesHtml(assignment) {
+  return assignment.responses.length === 0
+    ? `<p class="muted">아직 제출한 학생이 없습니다.</p>`
+    : assignment.responses
+        .map((response) => {
+          const problems = response.problems.length
+            ? response.problems.map((problem) => problemLabel(assignment, problem)).join(", ")
+            : "질문 없음";
+          const files = (response.files || []).length ? ` · 사진 첨부함` : "";
+          return `<div class="response-row"><strong>${escapeHtml(response.studentName)}</strong><span>${escapeHtml(problems)}${files}</span><em>${escapeHtml(formatDateTime(response.updatedAt))}</em></div>`;
+        })
+        .join("");
+}
+
+function assignmentDetailHtml(assignment) {
+  return `
+    ${assignmentInsightsHtml(assignment)}
+    <div class="problem-grid">${problemGridHtml(assignment)}</div>
+    <details>
+      <summary>학생별 제출 보기</summary>
+      <div class="responses">${responsesHtml(assignment)}</div>
+    </details>
+  `;
+}
+
+function assignmentCardHtml(assignment, options = {}) {
+  const assignmentLink = studentUrl(assignment.id);
+  const fixedClassLink = classUrl(assignment.className || "공통");
+  const modeClass = options.past ? "assignment past-assignment-card" : "assignment latest-assignment-card";
+  return `
+    <article class="${modeClass}" data-assignment-id="${escapeHtml(assignment.id)}">
+      <div class="assignment-head">
+        <div>
+          <p class="eyebrow class-name">${escapeHtml(assignment.className || "공통")}</p>
+          <h3>${escapeHtml(assignment.title)}</h3>
+          <p class="muted">${escapeHtml(assignment.dateLabel)} · ${escapeHtml(rangeLabel(assignment))}</p>
+        </div>
+        <div class="actions">
+          ${options.past ? "" : `<button class="copy-summary" type="button" data-id="${escapeHtml(assignment.id)}">수업 전 요약 복사</button>`}
+          <button class="copy-class-link" type="button" data-url="${escapeHtml(fixedClassLink)}">반 링크 복사</button>
+          <button class="copy-link" type="button" data-url="${escapeHtml(assignmentLink)}">이 과제 링크 복사</button>
+          <a class="student-link" href="${escapeHtml(assignmentLink)}" target="_blank" rel="noreferrer">열기</a>
+        </div>
+      </div>
+      <div class="stats">${assignmentStatsHtml(assignment)}</div>
+      <details class="assignment-detail">
+        <summary>자세히 보기</summary>
+        ${assignmentDetailHtml(assignment)}
+      </details>
+    </article>
+  `;
 }
 
 function renderClasses(assignments) {
@@ -161,6 +316,7 @@ function renderClasses(assignments) {
 
 function renderAssignments(assignments) {
   const orderedAssignments = assignments.slice().sort((a, b) => compareByClassOrder(a, b) || b.createdAt.localeCompare(a.createdAt));
+  latestAssignments = orderedAssignments;
   countBadge.textContent = `${orderedAssignments.length}개`;
   list.innerHTML = "";
   renderClasses(orderedAssignments);
@@ -170,83 +326,49 @@ function renderAssignments(assignments) {
     return;
   }
 
-  for (const assignment of orderedAssignments) {
-    const node = template.content.firstElementChild.cloneNode(true);
-    node.querySelector(".class-name").textContent = assignment.className || "공통";
-    node.querySelector("h3").textContent = assignment.title;
-    node.querySelector(".muted").textContent = `${assignment.dateLabel} · ${rangeLabel(assignment)}`;
+  list.innerHTML = groupedByClass(orderedAssignments)
+    .map((group) => {
+      const [latest, ...past] = group.assignments;
+      return `
+        <section class="class-assignment-group">
+          ${assignmentCardHtml(latest)}
+          ${
+            past.length
+              ? `
+                <details class="past-assignment-list">
+                  <summary>지난 과제 보기 ${past.length}개</summary>
+                  <div class="past-assignment-items">
+                    ${past.map((assignment) => assignmentCardHtml(assignment, { past: true })).join("")}
+                  </div>
+                </details>
+              `
+              : `<p class="muted no-past">지난 과제 없음</p>`
+          }
+        </section>
+      `;
+    })
+    .join("");
 
-    const assignmentLink = studentUrl(assignment.id);
-    const fixedClassLink = classUrl(assignment.className || "공통");
-    const linkButton = node.querySelector(".student-link");
-    linkButton.href = assignmentLink;
-    linkButton.textContent = "과제 열기";
-
-    node.querySelector(".copy-class-link").addEventListener("click", (event) => {
-      copyToClipboard(fixedClassLink, event.currentTarget, "반 링크 복사");
+  list.querySelectorAll(".copy-class-link").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      copyToClipboard(event.currentTarget.dataset.url, event.currentTarget, "반 링크 복사");
     });
+  });
 
-    node.querySelector(".copy-link").addEventListener("click", (event) => {
-      copyToClipboard(assignmentLink, event.currentTarget, "이 과제 링크 복사");
+  list.querySelectorAll(".copy-link").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      copyToClipboard(event.currentTarget.dataset.url, event.currentTarget, "이 과제 링크 복사");
     });
+  });
 
-    const stats = node.querySelector(".stats");
-    const totalQuestions = Object.values(assignment.counts).reduce((sum, value) => sum + value, 0);
-    stats.innerHTML = `
-      <span class="stat">${submissionRateText(assignment)}</span>
-      <span class="stat">도와줘요 쌤 ${totalQuestions}개</span>
-      <span class="stat">문항 ${assignment.problems.length}개</span>
-    `;
-
-    const missing = missingStudents(assignment);
-    const topItems = topHelpProblems(assignment);
-    stats.insertAdjacentHTML(
-      "afterend",
-      `
-        <div class="teacher-insights">
-          <section>
-            <h4>미제출 학생</h4>
-            <p>${missing.length ? escapeHtml(missing.join(", ")) : "없음"}</p>
-          </section>
-          <section>
-            <h4>도와줘요 쌤 TOP 5</h4>
-            <p>${
-              topItems.length
-                ? topItems.map((item) => `${escapeHtml(item.label)} ${item.count}명`).join(" · ")
-                : "아직 없음"
-            }</p>
-          </section>
-        </div>
-      `,
-    );
-
-    const grid = node.querySelector(".problem-grid");
-    const items = assignment.items || assignment.problems.map((problem) => ({ id: String(problem), label: `${problem}번` }));
-    grid.innerHTML = items
-      .map((item) => {
-        const questionCount = assignment.counts[item.id] || 0;
-        const names = assignment.studentsByProblem[item.id] || [];
-        const title = names.length ? `${names.join(", ")} 질문` : "질문 없음";
-        return `<div class="problem-cell ${questionCount > 0 ? "hot" : ""}" title="${escapeHtml(title)}">${escapeHtml(item.label)} · ${questionCount}명</div>`;
-      })
-      .join("");
-
-    const responses = node.querySelector(".responses");
-    responses.innerHTML =
-      assignment.responses.length === 0
-        ? `<p class="muted">아직 제출한 학생이 없습니다.</p>`
-        : assignment.responses
-            .map((response) => {
-              const problems = response.problems.length ? response.problems.map((problem) => problemLabel(assignment, problem)).join(", ") : "질문 없음";
-              const files = (response.files || []).length
-                ? ` · 사진 첨부함`
-                : "";
-              return `<div class="response-row"><strong>${escapeHtml(response.studentName)}</strong><span>${escapeHtml(problems)}${files}</span><em>${escapeHtml(formatDateTime(response.updatedAt))}</em></div>`;
-            })
-            .join("");
-
-    list.appendChild(node);
-  }
+  list.querySelectorAll(".copy-summary").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const assignment = latestAssignments.find((item) => item.id === event.currentTarget.dataset.id);
+      if (assignment) {
+        copyToClipboard(lessonSummaryText(assignment), event.currentTarget, "수업 전 요약 복사");
+      }
+    });
+  });
 }
 
 async function loadAssignments() {

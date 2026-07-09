@@ -109,6 +109,10 @@ function assignmentOptionLabel(assignment, index) {
   return `${status} · ${displayDateLabel(assignment.dateLabel)} · ${assignment.rangeLabel || assignment.title}`;
 }
 
+function pastAssignmentOptionLabel(assignment) {
+  return `${displayDateLabel(assignment.dateLabel)} ${assignment.rangeLabel || assignment.title}`;
+}
+
 function renderSelectedPhotos(input, list) {
   const files = [...input.files];
   list.innerHTML = files.length
@@ -158,7 +162,7 @@ function renderPastAssignmentSelector(assignments) {
   pastAssignmentSelect.disabled = false;
   pastSubmitBtn.disabled = false;
   pastAssignmentSelect.innerHTML = pastAssignments
-    .map((assignment, index) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignmentOptionLabel(assignment, index + 1))}</option>`)
+    .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(pastAssignmentOptionLabel(assignment))}</option>`)
     .join("");
   renderPastProblems(pastAssignments[0]);
 }
