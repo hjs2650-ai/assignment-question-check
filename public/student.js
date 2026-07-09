@@ -14,6 +14,9 @@ const photoInput = document.querySelector("#photoFiles");
 const photoList = document.querySelector("#photoList");
 const pastAssignmentWrap = document.querySelector("#pastAssignmentWrap");
 const pastAssignmentSelect = document.querySelector("#pastAssignmentSelect");
+const pastProblemWrap = document.querySelector("#pastProblemWrap");
+const pastProblemGrid = document.querySelector("#pastProblemGrid");
+const pastCheckedCount = document.querySelector("#pastCheckedCount");
 const pastPhotoInput = document.querySelector("#pastPhotoFiles");
 const pastPhotoList = document.querySelector("#pastPhotoList");
 const pastSubmitBtn = document.querySelector("#pastSubmitBtn");
@@ -37,6 +40,11 @@ async function api(path, options = {}) {
 function updateCount() {
   const count = grid.querySelectorAll("input:checked").length;
   checkedCount.textContent = `${count}개 선택`;
+}
+
+function updatePastCount() {
+  const count = pastProblemGrid.querySelectorAll("input:checked").length;
+  pastCheckedCount.textContent = `${count}개 선택`;
 }
 
 function escapeHtml(value) {
@@ -66,16 +74,16 @@ function renderProblemCells(items) {
     .join("");
 }
 
-function renderProblems(assignment) {
+function renderProblemsInto(assignment, targetGrid) {
   const items = Array.isArray(assignment.items) ? assignment.items : assignment.problems || [];
   const books = Array.isArray(assignment.books) && assignment.books.length > 0 ? assignment.books : null;
 
   if (!books || books.length === 1) {
-    grid.innerHTML = renderProblemCells(items);
+    targetGrid.innerHTML = renderProblemCells(items);
     return;
   }
 
-  grid.innerHTML = books
+  targetGrid.innerHTML = books
     .map((bookRange) => {
       const rangeItems = items.filter((item) => item.book === bookRange.book && (bookRange.problems || []).includes(item.id));
       return `
@@ -86,6 +94,10 @@ function renderProblems(assignment) {
       `;
     })
     .join("");
+}
+
+function renderProblems(assignment) {
+  renderProblemsInto(assignment, grid);
 }
 
 function displayDateLabel(dateLabel) {
@@ -137,6 +149,9 @@ function renderPastAssignmentSelector(assignments) {
     pastAssignmentSelect.disabled = true;
     pastSubmitBtn.disabled = true;
     pastAssignmentSelect.innerHTML = '<option value="">지난 과제가 쌓이면 여기서 선택할 수 있어요.</option>';
+    pastProblemWrap.hidden = true;
+    pastProblemGrid.innerHTML = "";
+    updatePastCount();
     return;
   }
 
@@ -145,6 +160,20 @@ function renderPastAssignmentSelector(assignments) {
   pastAssignmentSelect.innerHTML = pastAssignments
     .map((assignment, index) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignmentOptionLabel(assignment, index + 1))}</option>`)
     .join("");
+  renderPastProblems(pastAssignments[0]);
+}
+
+function renderPastProblems(assignment) {
+  if (!assignment) {
+    pastProblemWrap.hidden = true;
+    pastProblemGrid.innerHTML = "";
+    updatePastCount();
+    return;
+  }
+
+  pastProblemWrap.hidden = false;
+  renderProblemsInto(assignment, pastProblemGrid);
+  updatePastCount();
 }
 
 async function loadAssignment() {
@@ -190,6 +219,7 @@ async function submitPastAssignment() {
   const studentName = nameInput.value.trim();
   const selectedAssignmentId = pastAssignmentSelect.value;
   const files = await selectedPhotosPayload(pastPhotoInput);
+  const problems = [...pastProblemGrid.querySelectorAll("input:checked")].map((input) => input.value);
 
   if (!studentName) {
     pastMessage.className = "message error";
@@ -220,7 +250,7 @@ async function submitPastAssignment() {
       body: JSON.stringify({
         studentName,
         files,
-        keepProblems: true,
+        ...(problems.length ? { problems } : { keepProblems: true }),
       }),
     });
     pastPhotoInput.value = "";
@@ -235,9 +265,12 @@ async function submitPastAssignment() {
 photoInput.addEventListener("change", () => renderSelectedPhotos(photoInput, photoList));
 pastPhotoInput.addEventListener("change", () => renderSelectedPhotos(pastPhotoInput, pastPhotoList));
 grid.addEventListener("change", updateCount);
+pastProblemGrid.addEventListener("change", updatePastCount);
 pastAssignmentSelect.addEventListener("change", () => {
   pastMessage.textContent = "";
   pastMessage.className = "message";
+  const selected = availableAssignments.find((assignment) => assignment.id === pastAssignmentSelect.value);
+  renderPastProblems(selected);
 });
 pastSubmitBtn.addEventListener("click", () => {
   submitPastAssignment().catch((error) => {

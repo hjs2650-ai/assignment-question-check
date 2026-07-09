@@ -49,12 +49,18 @@
           <section id="pastAssignmentWrap" class="past-assignment-panel">
             <div class="section-head compact">
               <h2>지난과제 제출</h2>
-              <span class="badge">늦은 제출</span>
             </div>
             <label>
               제출할 과제
               <select id="pastAssignmentSelect"></select>
             </label>
+            <section id="pastProblemWrap" class="past-problem-wrap" hidden>
+              <div class="section-head compact">
+                <h3>지난과제 질문하고 싶은 문제들</h3>
+                <span id="pastCheckedCount" class="badge">0개 선택</span>
+              </div>
+              <div id="pastProblemGrid" class="check-grid past-check-grid"></div>
+            </section>
             <label class="photo-upload">
               지난과제 사진 첨부
               <input id="pastPhotoFiles" type="file" accept="image/*" multiple />
