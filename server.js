@@ -169,6 +169,7 @@ function normalizeData(data) {
   data.classes.forEach((classInfo) => {
     classInfo.name = normalizeClassName(classInfo.name);
     classInfo.students = Array.isArray(classInfo.students) ? classInfo.students.map(normalizeText).filter(Boolean) : [];
+    classInfo.studentStartDates = classInfo.studentStartDates && typeof classInfo.studentStartDates === "object" ? classInfo.studentStartDates : {};
   });
   data.assignments.forEach((assignment) => {
     assignment.className = normalizeClassName(assignment.className);
@@ -210,6 +211,27 @@ function studentsForClass(data, className) {
   const targetClass = normalizeClassName(className);
   const classInfo = data.classes.find((item) => normalizeClassName(item.name) === targetClass);
   return classInfo ? classInfo.students : [];
+}
+
+function dateKey(value) {
+  const match = normalizeText(value).match(/(\d{1,2})\s*\/\s*(\d{1,2})/);
+  if (!match) {
+    return 0;
+  }
+  return Number(match[1]) * 100 + Number(match[2]);
+}
+
+function studentsForAssignment(data, assignment) {
+  const targetClass = normalizeClassName(assignment.className);
+  const classInfo = data.classes.find((item) => normalizeClassName(item.name) === targetClass);
+  if (!classInfo) {
+    return [];
+  }
+  const assignmentDate = dateKey(assignment.dateLabel);
+  return classInfo.students.filter((student) => {
+    const startDate = dateKey(classInfo.studentStartDates && classInfo.studentStartDates[student]);
+    return !startDate || !assignmentDate || startDate <= assignmentDate;
+  });
 }
 
 function summaryFor(assignment) {
@@ -289,7 +311,7 @@ async function handleApi(req, res, pathname) {
     }
     sendJson(res, 200, {
       ...publicAssignment(assignment),
-      students: studentsForClass(data, className),
+      students: studentsForAssignment(data, assignment),
     });
     return;
   }
@@ -317,7 +339,7 @@ async function handleApi(req, res, pathname) {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map((assignment) => ({
           ...summaryFor(assignment),
-          students: studentsForClass(data, assignment.className),
+          students: studentsForAssignment(data, assignment),
         })),
     });
     return;
@@ -368,7 +390,7 @@ async function handleApi(req, res, pathname) {
     }
     sendJson(res, 200, {
       ...publicAssignment(assignment),
-      students: studentsForClass(data, assignment.className),
+      students: studentsForAssignment(data, assignment),
     });
     return;
   }
