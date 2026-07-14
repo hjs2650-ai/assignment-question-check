@@ -186,15 +186,44 @@ function lessonSummaryText(assignment) {
 }
 
 function noticeTitle(assignment) {
-  const title = `${assignment.dateLabel} ${assignment.title}`.replaceAll(/\s+/g, " ").trim();
+  const dateLabel = String(assignment.dateLabel || "").trim();
+  const rawTitle = String(assignment.title || "").replaceAll(/\s+/g, " ").trim();
+  const title = dateLabel && rawTitle.startsWith(dateLabel) ? rawTitle : `${dateLabel} ${rawTitle}`.trim();
   return title;
+}
+
+function givenName(name) {
+  const text = String(name || "").trim();
+  return text.length > 1 ? text.slice(1) : text;
+}
+
+function hasFinalConsonant(text) {
+  const last = String(text || "").trim().at(-1);
+  if (!last) {
+    return false;
+  }
+  const code = last.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) {
+    return false;
+  }
+  return (code - 0xac00) % 28 !== 0;
+}
+
+function parentName(student) {
+  const name = givenName(student);
+  return hasFinalConsonant(name) ? `${name}이 어머님` : `${name} 어머님`;
+}
+
+function friendlyStudentName(student) {
+  const name = givenName(student);
+  return hasFinalConsonant(name) ? `${name}아` : `${name}야`;
 }
 
 function parentMissingNotice(assignment, student) {
   const title = noticeTitle(assignment);
   return [
-    `${student} 어머님, 안녕하세요. 황종선T입니다.`,
-    `${title} 과제 제출 확인 중인데, 아직 과제 사진 제출이 확인되지 않아 안내드립니다.`,
+    `${parentName(student)}, 안녕하세요. 황종선T입니다.`,
+    `${title} 제출 확인 중인데, 아직 과제 사진 제출이 확인되지 않아 안내드립니다.`,
     `혹시 완료했는데 제출을 못 한 경우에는 오늘 중으로 사진 첨부만 부탁드립니다.`,
     `감사합니다.`,
   ].join("\n");
@@ -203,8 +232,8 @@ function parentMissingNotice(assignment, student) {
 function studentMissingNotice(assignment, student) {
   const title = noticeTitle(assignment);
   return [
-    `${student} 학생, ${title} 과제 사진 제출이 아직 확인되지 않았어요.`,
-    `했으면 사진만 올려주고, 아직이면 오늘 안에 제출해 주세요.`,
+    `${friendlyStudentName(student)}, ${title} 사진 제출이 아직 확인이 안 됐어.`,
+    `했으면 사진만 올려주고, 아직이면 오늘 안에 제출해줘.`,
   ].join("\n");
 }
 
