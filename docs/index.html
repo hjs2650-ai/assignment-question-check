@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>과제 클리어체크 준비 중</title>
+    <meta name="description" content="과제 화면을 준비하고 있습니다." />
+    <meta property="og:title" content="과제 클리어체크" />
+    <meta property="og:description" content="오늘의 미션을 준비하고 있습니다." />
+    <meta property="og:image" content="./assets/teacher-character.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="loader-shell">
+      <section class="loader-card">
+        <div class="class-pill" id="className">과제 확인 중</div>
+        <img class="teacher" src="./assets/teacher-character.png" alt="" />
+        <div class="copy">
+          <p class="eyebrow">오늘의 미션</p>
+          <h1>과제 화면 준비 중</h1>
+          <p class="range">잠시만 기다려 주세요.</p>
+          <p class="daily-note" id="dailyNote">오늘은 아쉬워도 괜찮아. 다음엔 더 잘할 수 있어.</p>
+          <p class="muted" id="statusText" hidden></p>
+          <div class="progress" aria-hidden="true"><span></span></div>
+        </div>
+      </section>
+
+      <section class="preview-panel" aria-hidden="true">
+        <div class="preview-head">
+          <strong>도와줘요 쌤</strong>
+          <span>0개 선택</span>
+        </div>
+        <div class="preview-grid">
+          <i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="preview-upload">과제 사진 첨부</div>
+      </section>
+    </main>
+
+    <script>
+      const RENDER_BASE = "https://assignment-question-check.onrender.com";
+      const CLASS_ROUTES = {
+        "tier": "/class/고1 1티어D3",
+        "1tier": "/class/고1 1티어D3",
+        "고1 1티어D3": "/class/고1 1티어D3",
+        "zenith": "/class/고1 제니트Z2",
+        "z2": "/class/고1 제니트Z2",
+        "고1 제니트Z2": "/class/고1 제니트Z2",
+        "sky": "/class/고1 SKYA3",
+        "a3": "/class/고1 SKYA3",
+        "고1 SKYA3": "/class/고1 SKYA3",
+      };
+
+      const params = new URLSearchParams(location.search);
+      const requestedClass = params.get("class") || params.get("c") || "";
+      const requestedPath = params.get("to") || CLASS_ROUTES[requestedClass] || "/";
+      const destinationPath = requestedPath.startsWith("/") ? requestedPath : `/${requestedPath}`;
+      const destination = `${RENDER_BASE}${destinationPath}`;
+      const statusText = document.querySelector("#statusText");
+      const className = document.querySelector("#className");
+      const dailyNote = document.querySelector("#dailyNote");
+      const dailyNotes = [
+        "오늘은 아쉬워도 괜찮아. 다음엔 더 잘할 수 있어.",
+        "이번에 잘 안 됐던 문제도, 다시 보면 분명 나아져.",
+        "오늘 헷갈렸던 부분이 다음엔 더 잘 보일 거야.",
+        "이번 과제가 아쉬웠다면, 다음 과제는 더 좋아질 수 있어.",
+        "지금 확인해두면 다음엔 훨씬 덜 헷갈릴 거야.",
+        "오늘 어려웠던 만큼, 다음엔 조금 더 편해질 거야.",
+        "이번에 놓친 문제는 다음번에 잡으면 돼.",
+        "오늘 실수한 부분이 다음번엔 조심할 부분이 돼.",
+        "지금은 어려워도, 다음엔 더 잘할 수 있어.",
+        "오늘 부족했던 부분은 다음에 좋아질 자리야.",
+        "이번에 아쉬웠던 문제도 다시 보면 달라질 수 있어.",
+        "오늘 잘 안 됐던 건 괜찮아. 다음에 다시 잡으면 돼.",
+        "지금 확인하는 만큼 다음번엔 더 편해질 거야.",
+        "오늘의 아쉬움은 다음번에 좋아질 힌트가 될 수 있어.",
+        "이번에는 어려웠어도 괜찮아. 다시 보면 조금씩 보일 거야.",
+        "오늘 못 잡은 부분은 다음 수업에서 같이 잡으면 돼.",
+        "이번에 흔들렸던 부분도 다시 보면 더 단단해질 수 있어.",
+        "오늘 조금 부족했어도 괜찮아. 다음에 나아지면 돼.",
+        "지금 체크해두면 다음번엔 더 잘할 수 있어.",
+        "이번에 어려웠던 문제도 한 번 더 보면 달라질 수 있어.",
+        "오늘의 실수는 다음번에 조심할 수 있는 표시야.",
+        "지금 아쉬운 부분이 다음번엔 강점이 될 수 있어.",
+        "오늘은 여기까지여도 괜찮아. 다음에 더 좋아지면 돼.",
+        "이번에 잘 안 풀렸던 것도 다시 만나면 더 익숙해질 거야.",
+        "오늘 확인한 만큼 다음번엔 조금 더 빨라질 수 있어.",
+        "아쉬운 문제는 괜찮아. 다음에 더 잘 보면 돼.",
+        "이번 과제가 어려웠다면, 다음엔 더 준비된 상태로 볼 수 있어.",
+        "오늘 헷갈린 만큼 다음엔 더 정확해질 수 있어.",
+        "지금은 부족해 보여도, 다시 보면 분명 나아져.",
+        "오늘 체크한 문제들이 다음번엔 더 잘 풀릴 수 있어.",
+        "이번에 아쉬웠던 만큼 다음엔 더 잘할 수 있어.",
+      ];
+
+      if (destinationPath.startsWith("/class/")) {
+        className.textContent = decodeURIComponent(destinationPath.replace("/class/", ""));
+      } else {
+        className.textContent = "관리 화면";
+      }
+
+      const start = new Date(new Date().getFullYear(), 0, 0);
+      const today = new Date();
+      const dayOfYear = Math.floor((today - start) / 86400000);
+      dailyNote.textContent = dailyNotes[dayOfYear % dailyNotes.length];
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      async function pingRender() {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12000);
+        try {
+          await fetch(`${RENDER_BASE}/api/health?wake=${Date.now()}`, {
+            mode: "no-cors",
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          return true;
+        } catch (error) {
+          return false;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function start() {
+        if (params.get("preview") === "1") {
+          statusText.textContent = "미리보기 화면입니다. 실제 링크에서는 자동으로 과제 화면으로 이동합니다.";
+          return;
+        }
+
+        const messages = [
+          "서버를 깨우고 과제를 불러오는 중입니다.",
+          "거의 준비됐습니다. 잠시만 기다려 주세요.",
+          "과제 화면으로 곧 이동합니다.",
+        ];
+
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          statusText.textContent = messages[Math.min(attempt, messages.length - 1)];
+          if (await pingRender()) {
+            location.replace(destination);
+            return;
+          }
+          await wait(1200);
+        }
+
+        statusText.textContent = "조금 오래 걸리고 있습니다. 화면으로 이동합니다.";
+        await wait(800);
+        location.replace(destination);
+      }
+
+      start();
+    </script>
+  </body>
+</html>
