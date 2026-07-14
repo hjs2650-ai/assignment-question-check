@@ -287,6 +287,23 @@ button:disabled {
   gap: 10px;
 }
 
+.compact-section {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.compact-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.compact-section .class-list {
+  margin-top: 14px;
+}
+
 .class-row {
   display: flex;
   align-items: center;
@@ -482,6 +499,27 @@ details {
   padding: 9px 12px;
   background: #fafcff;
   color: var(--primary);
+}
+
+.assignment-actions-menu {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.assignment-actions-menu > summary {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 12px;
+  background: var(--soft);
+  color: var(--primary);
+}
+
+.assignment-actions-menu .actions {
+  justify-content: flex-start;
+  margin-top: 10px;
 }
 
 .assignment-detail[open] > summary {

@@ -344,16 +344,19 @@ function assignmentCardHtml(assignment, options = {}) {
           <h3>${escapeHtml(assignment.title)}</h3>
           <p class="muted">${escapeHtml(assignment.dateLabel)} · ${escapeHtml(rangeLabel(assignment))}</p>
         </div>
+      </div>
+      <div class="stats">${assignmentStatsHtml(assignment)}</div>
+      <details class="assignment-actions-menu">
+        <summary>필요한 작업</summary>
         <div class="actions">
           ${options.past ? "" : `<button class="copy-summary" type="button" data-id="${escapeHtml(assignment.id)}">수업 전 요약 복사</button>`}
           <button class="copy-class-link" type="button" data-url="${escapeHtml(fixedClassLink)}">반 링크 복사</button>
           <button class="copy-link" type="button" data-url="${escapeHtml(assignmentLink)}">이 과제 링크 복사</button>
-          <a class="student-link" href="${escapeHtml(assignmentLink)}" target="_blank" rel="noreferrer">열기</a>
+          <a class="student-link" href="${escapeHtml(assignmentLink)}" target="_blank" rel="noreferrer">학생 화면 열기</a>
         </div>
-      </div>
-      <div class="stats">${assignmentStatsHtml(assignment)}</div>
+      </details>
       <details class="assignment-detail">
-        <summary>자세히 보기</summary>
+        <summary>질문/제출 확인</summary>
         ${assignmentDetailHtml(assignment)}
       </details>
     </article>
