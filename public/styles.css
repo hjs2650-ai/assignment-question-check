@@ -499,6 +499,35 @@ summary {
   margin-top: 10px;
 }
 
+.missing-notice-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.missing-notice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  background: #fafcff;
+}
+
+.mini-actions {
+  justify-content: flex-end;
+}
+
+.mini-actions button {
+  padding: 8px 10px;
+}
+
+.no-missing {
+  margin: 10px 0 0;
+}
+
 .response-row {
   display: grid;
   grid-template-columns: minmax(90px, 0.7fr) minmax(160px, 2fr) minmax(92px, auto);
@@ -783,9 +812,14 @@ body[data-theme="night"] .range-text {
   }
 
   .teacher-insights,
+  .missing-notice-row,
   .submission-options,
   .response-row {
     grid-template-columns: 1fr;
+  }
+
+  .missing-notice-row {
+    display: grid;
   }
 
   .response-row em {
