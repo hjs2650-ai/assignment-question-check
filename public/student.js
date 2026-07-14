@@ -24,6 +24,9 @@ const pastMessage = document.querySelector("#pastMessage");
 
 let assignmentId = routeType === "student" ? routeValue : "";
 let availableAssignments = [];
+let currentPhotoFiles = [];
+let pastPhotoFiles = [];
+const MAX_PHOTOS = 20;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -113,16 +116,38 @@ function pastAssignmentOptionLabel(assignment) {
   return `${displayDateLabel(assignment.dateLabel)} ${assignment.rangeLabel || assignment.title}`;
 }
 
-function renderSelectedPhotos(input, list) {
-  const files = [...input.files];
+function fileKey(file) {
+  return [file.name, file.size, file.lastModified].join(":");
+}
+
+function renderSelectedPhotos(files, list) {
   list.innerHTML = files.length
     ? files.map((file) => `<span>${file.name}</span>`).join("")
     : "";
 }
 
-async function selectedPhotosPayload(input) {
-  const files = [...input.files].filter((file) => file.type.startsWith("image/")).slice(0, 8);
-  return files.map((file) => ({
+function addSelectedPhotos(input, selectedFiles, list) {
+  const existingKeys = new Set(selectedFiles.map(fileKey));
+  const incomingFiles = [...input.files].filter((file) => file.type.startsWith("image/"));
+
+  for (const file of incomingFiles) {
+    if (selectedFiles.length >= MAX_PHOTOS) {
+      break;
+    }
+    const key = fileKey(file);
+    if (!existingKeys.has(key)) {
+      selectedFiles.push(file);
+      existingKeys.add(key);
+    }
+  }
+
+  input.value = "";
+  renderSelectedPhotos(selectedFiles, list);
+}
+
+async function selectedPhotosPayload(files) {
+  const selectedFiles = files.filter((file) => file.type.startsWith("image/")).slice(0, MAX_PHOTOS);
+  return selectedFiles.map((file) => ({
     name: file.name,
     mimeType: file.type || "image/jpeg",
   }));
@@ -201,7 +226,7 @@ form.addEventListener("submit", async (event) => {
   message.className = "message";
   message.textContent = "제출 중입니다.";
   const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
-  const files = await selectedPhotosPayload(photoInput);
+  const files = await selectedPhotosPayload(currentPhotoFiles);
   await api(`/api/assignments/${assignmentId}/responses`, {
     method: "POST",
     body: JSON.stringify({
@@ -210,8 +235,9 @@ form.addEventListener("submit", async (event) => {
       files,
     }),
   });
+  currentPhotoFiles = [];
   photoInput.value = "";
-  renderSelectedPhotos(photoInput, photoList);
+  renderSelectedPhotos(currentPhotoFiles, photoList);
   message.className = "message success";
   message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.</span>";
 });
@@ -222,7 +248,7 @@ async function submitPastAssignment() {
 
   const studentName = nameInput.value.trim();
   const selectedAssignmentId = pastAssignmentSelect.value;
-  const files = await selectedPhotosPayload(pastPhotoInput);
+  const files = await selectedPhotosPayload(pastPhotoFiles);
   const problems = [...pastProblemGrid.querySelectorAll("input:checked")].map((input) => input.value);
 
   if (!studentName) {
@@ -257,8 +283,9 @@ async function submitPastAssignment() {
         ...(problems.length ? { problems } : { keepProblems: true }),
       }),
     });
+    pastPhotoFiles = [];
     pastPhotoInput.value = "";
-    renderSelectedPhotos(pastPhotoInput, pastPhotoList);
+    renderSelectedPhotos(pastPhotoFiles, pastPhotoList);
     pastMessage.className = "message success";
     pastMessage.innerHTML = `<strong>지난과제 제출 완료되었습니다.</strong><span>${escapeHtml(selected?.dateLabel || "선택한 날짜")} 과제 제출로 기록되었습니다.</span>`;
   } finally {
@@ -266,8 +293,8 @@ async function submitPastAssignment() {
   }
 }
 
-photoInput.addEventListener("change", () => renderSelectedPhotos(photoInput, photoList));
-pastPhotoInput.addEventListener("change", () => renderSelectedPhotos(pastPhotoInput, pastPhotoList));
+photoInput.addEventListener("change", () => addSelectedPhotos(photoInput, currentPhotoFiles, photoList));
+pastPhotoInput.addEventListener("change", () => addSelectedPhotos(pastPhotoInput, pastPhotoFiles, pastPhotoList));
 grid.addEventListener("change", updateCount);
 pastProblemGrid.addEventListener("change", updatePastCount);
 pastAssignmentSelect.addEventListener("change", () => {
