@@ -185,6 +185,44 @@ function lessonSummaryText(assignment) {
   ].join("\n");
 }
 
+function missingNoticeText(assignment) {
+  const missing = missingStudents(assignment);
+  const title = `${assignment.dateLabel} ${assignment.title}`.replaceAll(/\s+/g, " ").trim();
+  const range = rangeLabel(assignment);
+
+  if (!missing.length) {
+    return `[${assignment.className || "공통"} ${assignment.title}]\n미제출 학생이 없습니다.`;
+  }
+
+  const parentMessages = missing.map((student) =>
+    [
+      `${student} 어머님, 안녕하세요. 황종선T입니다.`,
+      `${title} 과제 제출 확인 중인데, 아직 과제 사진 제출이 확인되지 않아 안내드립니다.`,
+      `혹시 완료했는데 제출을 못 한 경우에는 오늘 중으로 사진 첨부만 부탁드립니다.`,
+      `감사합니다.`,
+    ].join("\n"),
+  );
+
+  const studentMessages = missing.map((student) =>
+    [
+      `${student} 학생, ${title} 과제 사진 제출이 아직 확인되지 않았어요.`,
+      `했으면 사진만 올려주고, 아직이면 오늘 안에 제출해 주세요.`,
+    ].join("\n"),
+  );
+
+  return [
+    `[${assignment.className || "공통"} ${assignment.title}]`,
+    `${assignment.dateLabel} · ${range}`,
+    `미제출: ${missing.join(", ")}`,
+    "",
+    "[어머님용]",
+    parentMessages.join("\n\n---\n\n"),
+    "",
+    "[학생용]",
+    studentMessages.join("\n\n---\n\n"),
+  ].join("\n");
+}
+
 function assignmentStatsHtml(assignment) {
   return `
     <span class="stat">${submissionRateText(assignment)}</span>
@@ -265,6 +303,7 @@ function assignmentCardHtml(assignment, options = {}) {
         </div>
         <div class="actions">
           ${options.past ? "" : `<button class="copy-summary" type="button" data-id="${escapeHtml(assignment.id)}">수업 전 요약 복사</button>`}
+          <button class="copy-missing" type="button" data-id="${escapeHtml(assignment.id)}">미제출 안내 복사</button>
           <button class="copy-class-link" type="button" data-url="${escapeHtml(fixedClassLink)}">반 링크 복사</button>
           <button class="copy-link" type="button" data-url="${escapeHtml(assignmentLink)}">이 과제 링크 복사</button>
           <a class="student-link" href="${escapeHtml(assignmentLink)}" target="_blank" rel="noreferrer">열기</a>
@@ -366,6 +405,15 @@ function renderAssignments(assignments) {
       const assignment = latestAssignments.find((item) => item.id === event.currentTarget.dataset.id);
       if (assignment) {
         copyToClipboard(lessonSummaryText(assignment), event.currentTarget, "수업 전 요약 복사");
+      }
+    });
+  });
+
+  list.querySelectorAll(".copy-missing").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const assignment = latestAssignments.find((item) => item.id === event.currentTarget.dataset.id);
+      if (assignment) {
+        copyToClipboard(missingNoticeText(assignment), event.currentTarget, "미제출 안내 복사");
       }
     });
   });
