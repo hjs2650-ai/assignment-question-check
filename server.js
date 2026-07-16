@@ -279,17 +279,15 @@ function latestAssignmentForClass(data, className) {
 }
 
 async function handleApi(req, res, pathname) {
-  const data = normalizeData(await store.read());
-
   if (req.method === "GET" && pathname === "/api/health") {
     sendJson(res, 200, {
       ok: true,
       storage: store.kind,
-      assignmentCount: data.assignments.length,
-      classCount: classNames(data).length,
     });
     return;
   }
+
+  const data = normalizeData(await store.read());
 
   if (req.method === "GET" && pathname === "/api/classes") {
     sendJson(res, 200, {
