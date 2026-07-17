@@ -4,6 +4,26 @@ function emptyData() {
   return { assignments: [] };
 }
 
+function compactData(data) {
+  if (!data || !Array.isArray(data.assignments)) {
+    return emptyData();
+  }
+
+  return {
+    ...data,
+    assignments: data.assignments.map((assignment) => {
+      const { problems, responses, ...savedAssignment } = assignment;
+      return {
+        ...savedAssignment,
+        responses: (responses || []).map((response) => {
+          const { files, ...savedResponse } = response;
+          return savedResponse;
+        }),
+      };
+    }),
+  };
+}
+
 function createLocalStore(localFile) {
   return {
     kind: "local-json",
@@ -62,8 +82,9 @@ function createSheetsStore(sheetsUrl, sheetsSecret, fallbackStore) {
       return payload.data || emptyData();
     },
     async write(data) {
-      await request("write", data);
-      await fallbackStore.write(data);
+      const compact = compactData(data);
+      await request("write", compact);
+      await fallbackStore.write(compact);
     },
     async uploadFiles(assignment, studentName, files) {
       const payload = await request("uploadFiles", {
@@ -90,4 +111,4 @@ function createStore(options) {
   return localStore;
 }
 
-module.exports = { createStore };
+module.exports = { compactData, createStore };
