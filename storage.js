@@ -15,6 +15,9 @@ function compactData(data) {
       const { problems, responses, ...savedAssignment } = assignment;
       return {
         ...savedAssignment,
+        books: Array.isArray(savedAssignment.books)
+          ? savedAssignment.books.map(({ problems: bookProblems, ...book }) => book)
+          : savedAssignment.books,
         responses: (responses || []).map((response) => {
           const { files, ...savedResponse } = response;
           return savedResponse;
