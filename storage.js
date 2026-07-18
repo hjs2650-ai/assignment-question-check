@@ -86,7 +86,16 @@ function createSheetsStore(sheetsUrl, sheetsSecret, fallbackStore) {
     },
     async write(data) {
       const compact = compactData(data);
-      await request("write", compact);
+      try {
+        await request("write", compact);
+      } catch (writeError) {
+        // Apps Script may save DATA successfully and then fail while refreshing
+        // the human-readable sheets. Confirm the primary data before failing.
+        const verification = await request("read");
+        if (JSON.stringify(verification.data || emptyData()) !== JSON.stringify(compact)) {
+          throw writeError;
+        }
+      }
       await fallbackStore.write(compact);
     },
     async uploadFiles(assignment, studentName, files) {
