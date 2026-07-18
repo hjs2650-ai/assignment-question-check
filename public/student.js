@@ -7,6 +7,7 @@ const classNameEl = document.querySelector("#className");
 const rangeText = document.querySelector("#rangeText");
 const grid = document.querySelector("#problemGrid");
 const form = document.querySelector("#responseForm");
+const submitButton = form.querySelector('button[type="submit"]');
 const nameInput = document.querySelector("#studentName");
 const checkedCount = document.querySelector("#checkedCount");
 const message = document.querySelector("#message");
@@ -225,21 +226,30 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   message.className = "message";
   message.textContent = "제출 중입니다.";
-  const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
-  const files = await selectedPhotosPayload(currentPhotoFiles);
-  await api(`/api/assignments/${assignmentId}/responses`, {
-    method: "POST",
-    body: JSON.stringify({
-      studentName: nameInput.value,
-      problems,
-      files,
-    }),
-  });
-  currentPhotoFiles = [];
-  photoInput.value = "";
-  renderSelectedPhotos(currentPhotoFiles, photoList);
-  message.className = "message success";
-  message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.</span>";
+  submitButton.disabled = true;
+
+  try {
+    const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
+    const files = await selectedPhotosPayload(currentPhotoFiles);
+    await api(`/api/assignments/${assignmentId}/responses`, {
+      method: "POST",
+      body: JSON.stringify({
+        studentName: nameInput.value,
+        problems,
+        files,
+      }),
+    });
+    currentPhotoFiles = [];
+    photoInput.value = "";
+    renderSelectedPhotos(currentPhotoFiles, photoList);
+    message.className = "message success";
+    message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.</span>";
+  } catch (error) {
+    message.className = "message error";
+    message.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
 });
 
 async function submitPastAssignment() {
