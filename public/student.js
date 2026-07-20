@@ -13,6 +13,10 @@ const checkedCount = document.querySelector("#checkedCount");
 const message = document.querySelector("#message");
 const photoInput = document.querySelector("#photoFiles");
 const photoList = document.querySelector("#photoList");
+const submissionTabs = document.querySelector("#submissionTabs");
+const currentSubmissionTab = document.querySelector("#currentSubmissionTab");
+const pastSubmissionTab = document.querySelector("#pastSubmissionTab");
+const currentSubmissionPanel = document.querySelector("#currentSubmissionPanel");
 const pastAssignmentWrap = document.querySelector("#pastAssignmentWrap");
 const pastAssignmentSelect = document.querySelector("#pastAssignmentSelect");
 const pastProblemWrap = document.querySelector("#pastProblemWrap");
@@ -27,6 +31,7 @@ let assignmentId = routeType === "student" ? routeValue : "";
 let availableAssignments = [];
 let currentPhotoFiles = [];
 let pastPhotoFiles = [];
+let activeSubmissionMode = "current";
 const MAX_PHOTOS = 20;
 
 async function api(path, options = {}) {
@@ -117,6 +122,21 @@ function pastAssignmentOptionLabel(assignment) {
   return `${displayDateLabel(assignment.dateLabel)} ${assignment.rangeLabel || assignment.title}`;
 }
 
+function setSubmissionMode(mode) {
+  if (mode === "past" && routeType !== "class") {
+    return;
+  }
+
+  activeSubmissionMode = mode;
+  const showCurrent = mode === "current";
+  currentSubmissionPanel.hidden = !showCurrent;
+  pastAssignmentWrap.hidden = showCurrent;
+  currentSubmissionTab.classList.toggle("is-active", showCurrent);
+  pastSubmissionTab.classList.toggle("is-active", !showCurrent);
+  currentSubmissionTab.setAttribute("aria-selected", String(showCurrent));
+  pastSubmissionTab.setAttribute("aria-selected", String(!showCurrent));
+}
+
 function fileKey(file) {
   return [file.name, file.size, file.lastModified].join(":");
 }
@@ -169,11 +189,12 @@ function showAssignment(assignment) {
 function renderPastAssignmentSelector(assignments) {
   availableAssignments = assignments;
   if (routeType !== "class") {
+    submissionTabs.hidden = true;
     pastAssignmentWrap.hidden = true;
     return;
   }
 
-  pastAssignmentWrap.hidden = false;
+  submissionTabs.hidden = false;
   const pastAssignments = assignments.slice(1);
   if (!pastAssignments.length) {
     pastAssignmentSelect.disabled = true;
@@ -182,6 +203,7 @@ function renderPastAssignmentSelector(assignments) {
     pastProblemWrap.hidden = true;
     pastProblemGrid.innerHTML = "";
     updatePastCount();
+    setSubmissionMode(activeSubmissionMode);
     return;
   }
 
@@ -191,6 +213,7 @@ function renderPastAssignmentSelector(assignments) {
     .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(pastAssignmentOptionLabel(assignment))}</option>`)
     .join("");
   renderPastProblems(pastAssignments[0]);
+  setSubmissionMode(activeSubmissionMode);
 }
 
 function renderPastProblems(assignment) {
@@ -218,6 +241,7 @@ async function loadAssignment() {
   }
 
   pastAssignmentWrap.hidden = true;
+  submissionTabs.hidden = true;
   const assignment = await api(`/api/assignments/${assignmentId}`);
   showAssignment(assignment);
 }
@@ -305,6 +329,8 @@ async function submitPastAssignment() {
 
 photoInput.addEventListener("change", () => addSelectedPhotos(photoInput, currentPhotoFiles, photoList));
 pastPhotoInput.addEventListener("change", () => addSelectedPhotos(pastPhotoInput, pastPhotoFiles, pastPhotoList));
+currentSubmissionTab.addEventListener("click", () => setSubmissionMode("current"));
+pastSubmissionTab.addEventListener("click", () => setSubmissionMode("past"));
 grid.addEventListener("change", updateCount);
 pastProblemGrid.addEventListener("change", updatePastCount);
 pastAssignmentSelect.addEventListener("change", () => {

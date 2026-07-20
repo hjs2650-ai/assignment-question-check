@@ -32,21 +32,28 @@
             이름
             <input id="studentName" placeholder="예: 홍길동" autocomplete="name" required />
           </label>
-          <div class="section-head">
-            <h2>도와줘요 쌤</h2>
-            <span id="checkedCount" class="badge">0개 선택</span>
+          <div id="submissionTabs" class="submission-tabs" role="tablist" aria-label="과제 제출 종류">
+            <button id="currentSubmissionTab" class="submission-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="currentSubmissionPanel">오늘 과제 제출</button>
+            <button id="pastSubmissionTab" class="submission-tab" type="button" role="tab" aria-selected="false" aria-controls="pastAssignmentWrap">지난 과제 제출</button>
           </div>
-          <div id="problemGrid" class="check-grid"></div>
-          <label class="photo-upload">
-            과제 사진 첨부
-            <input id="photoFiles" type="file" accept="image/*" multiple />
-            <span class="muted">사진 파일은 보관하지 않고 첨부 여부만 기록됩니다.</span>
-          </label>
-          <div id="photoList" class="photo-list"></div>
-          <button class="primary full" type="submit">제출하기</button>
-          <p id="message" class="message"></p>
 
-          <section id="pastAssignmentWrap" class="past-assignment-panel">
+          <section id="currentSubmissionPanel" class="current-submission-panel" role="tabpanel" aria-labelledby="currentSubmissionTab">
+            <div class="section-head">
+              <h2>도와줘요 쌤</h2>
+              <span id="checkedCount" class="badge">0개 선택</span>
+            </div>
+            <div id="problemGrid" class="check-grid"></div>
+            <label class="photo-upload">
+              과제 사진 첨부
+              <input id="photoFiles" type="file" accept="image/*" multiple />
+              <span class="muted">사진 파일은 보관하지 않고 첨부 여부만 기록됩니다.</span>
+            </label>
+            <div id="photoList" class="photo-list"></div>
+            <button class="primary full" type="submit">오늘 과제 제출하기</button>
+            <p id="message" class="message"></p>
+          </section>
+
+          <section id="pastAssignmentWrap" class="past-assignment-panel" role="tabpanel" aria-labelledby="pastSubmissionTab" hidden>
             <div class="section-head compact">
               <h2>지난과제 제출</h2>
             </div>

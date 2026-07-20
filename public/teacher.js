@@ -6,9 +6,19 @@ const classCountBadge = document.querySelector("#classCount");
 const refreshButton = document.querySelector("#refreshButton");
 const template = document.querySelector("#assignmentTemplate");
 const classOptions = document.querySelector("#classOptions");
+const teacherClassTabs = document.querySelector("#teacherClassTabs");
+const currentAssignmentTab = document.querySelector("#currentAssignmentTab");
+const pastAssignmentsTab = document.querySelector("#pastAssignmentsTab");
+const selectedClassTitle = document.querySelector("#selectedClassTitle");
+const selectedClassContext = document.querySelector("#selectedClassContext");
+const selectedClassSummary = document.querySelector("#selectedClassSummary");
+const todayClassLabel = document.querySelector("#todayClassLabel");
 const defaultClasses = [];
 const fixedClassOrder = ["고1 1티어D3", "고1 제니트Z2", "고1 SKYA3"];
 let latestAssignments = [];
+let selectedClassName = "";
+let assignmentViewMode = "current";
+let selectedPastAssignmentId = "";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -83,6 +93,28 @@ function compareByClassOrder(a, b) {
     return orderDiff;
   }
   return classA.localeCompare(classB, "ko");
+}
+
+function classForDay(day = new Date().getDay()) {
+  if (day === 2 || day === 4) {
+    return "고1 제니트Z2";
+  }
+  if (day === 3 || day === 6) {
+    return "고1 SKYA3";
+  }
+  return "고1 1티어D3";
+}
+
+function shortClassName(className) {
+  return String(className || "공통").replace(/^고1\s*/, "");
+}
+
+function todayLabel() {
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date());
 }
 
 async function copyToClipboard(text, button, label) {
@@ -320,7 +352,10 @@ function responsesHtml(assignment) {
 function assignmentDetailHtml(assignment) {
   return `
     ${assignmentInsightsHtml(assignment)}
-    <div class="problem-grid">${problemGridHtml(assignment)}</div>
+    <details>
+      <summary>전체 문제별 질문 보기</summary>
+      <div class="problem-grid">${problemGridHtml(assignment)}</div>
+    </details>
     <details>
       <summary>학생별 제출 보기</summary>
       <div class="responses">${responsesHtml(assignment)}</div>
@@ -345,7 +380,6 @@ function assignmentCardHtml(assignment, options = {}) {
           <p class="muted">${escapeHtml(assignment.dateLabel)} · ${escapeHtml(rangeLabel(assignment))}</p>
         </div>
       </div>
-      <div class="stats">${assignmentStatsHtml(assignment)}</div>
       <details class="assignment-actions-menu">
         <summary>필요한 작업</summary>
         <div class="actions">
@@ -355,10 +389,7 @@ function assignmentCardHtml(assignment, options = {}) {
           <a class="student-link" href="${escapeHtml(assignmentLink)}" target="_blank" rel="noreferrer">학생 화면 열기</a>
         </div>
       </details>
-      <details class="assignment-detail">
-        <summary>질문/제출 확인</summary>
-        ${assignmentDetailHtml(assignment)}
-      </details>
+      <div class="assignment-detail">${assignmentDetailHtml(assignment)}</div>
     </article>
   `;
 }
@@ -398,41 +429,7 @@ function renderClasses(assignments) {
   });
 }
 
-function renderAssignments(assignments) {
-  const orderedAssignments = assignments.slice().sort((a, b) => compareByClassOrder(a, b) || b.createdAt.localeCompare(a.createdAt));
-  latestAssignments = orderedAssignments;
-  countBadge.textContent = `${orderedAssignments.length}개`;
-  list.innerHTML = "";
-  renderClasses(orderedAssignments);
-
-  if (orderedAssignments.length === 0) {
-    list.innerHTML = `<p class="muted">아직 만든 과제가 없습니다.</p>`;
-    return;
-  }
-
-  list.innerHTML = groupedByClass(orderedAssignments)
-    .map((group) => {
-      const [latest, ...past] = group.assignments;
-      return `
-        <section class="class-assignment-group">
-          ${assignmentCardHtml(latest)}
-          ${
-            past.length
-              ? `
-                <details class="past-assignment-list">
-                  <summary>지난 과제 보기 ${past.length}개</summary>
-                  <div class="past-assignment-items">
-                    ${past.map((assignment) => assignmentCardHtml(assignment, { past: true })).join("")}
-                  </div>
-                </details>
-              `
-              : `<p class="muted no-past">지난 과제 없음</p>`
-          }
-        </section>
-      `;
-    })
-    .join("");
-
+function bindRenderedAssignmentActions() {
   list.querySelectorAll(".copy-class-link").forEach((button) => {
     button.addEventListener("click", (event) => {
       copyToClipboard(event.currentTarget.dataset.url, event.currentTarget, "반 링크 복사");
@@ -473,6 +470,121 @@ function renderAssignments(assignments) {
   });
 }
 
+function renderTeacherClassTabs(classes) {
+  const scheduledClass = classForDay();
+  teacherClassTabs.innerHTML = classes
+    .map(
+      (className) => `
+        <button class="teacher-class-tab ${className === selectedClassName ? "is-active" : ""}" type="button" role="tab" aria-selected="${className === selectedClassName}" data-class="${escapeHtml(className)}">
+          <span>${escapeHtml(shortClassName(className))}</span>
+          ${className === scheduledClass ? `<em>${new Date().getDay() === 0 ? "다음 수업" : "오늘"}</em>` : ""}
+        </button>
+      `,
+    )
+    .join("");
+
+  teacherClassTabs.querySelectorAll(".teacher-class-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedClassName = button.dataset.class;
+      assignmentViewMode = "current";
+      selectedPastAssignmentId = "";
+      renderFocusedDashboard();
+    });
+  });
+}
+
+function teacherSummaryHtml(assignment) {
+  if (!assignment) {
+    return `<p class="muted">이 반에 등록된 과제가 없습니다.</p>`;
+  }
+  const students = Array.isArray(assignment.students) ? assignment.students : [];
+  const submitted = [...submittedNames(assignment)].filter((name) => students.includes(name)).length;
+  const missing = missingStudents(assignment).length;
+  return `
+    <div><span>제출</span><strong>${submitted}/${students.length}명</strong></div>
+    <div class="summary-missing"><span>미제출</span><strong>${missing}명</strong></div>
+    <div class="summary-questions"><span>질문</span><strong>${totalQuestionCount(assignment)}개</strong></div>
+  `;
+}
+
+function renderFocusedDashboard() {
+  const scheduledClass = classForDay();
+  const day = new Date().getDay();
+  const groups = groupedByClass(latestAssignments);
+  const group = groups.find((item) => item.className === selectedClassName);
+  const assignments = group ? group.assignments : [];
+  const [currentAssignment, ...pastAssignments] = assignments;
+  const contextLabel = selectedClassName === scheduledClass ? (day === 0 ? "다음 수업" : "오늘 수업") : "선택한 반";
+
+  renderTeacherClassTabs(groups.map((item) => item.className));
+  selectedClassTitle.textContent = selectedClassName || "과제 없음";
+  selectedClassContext.textContent = contextLabel;
+  currentAssignmentTab.classList.toggle("is-active", assignmentViewMode === "current");
+  pastAssignmentsTab.classList.toggle("is-active", assignmentViewMode === "past");
+  currentAssignmentTab.setAttribute("aria-selected", String(assignmentViewMode === "current"));
+  pastAssignmentsTab.setAttribute("aria-selected", String(assignmentViewMode === "past"));
+
+  let displayedAssignment = currentAssignment;
+  if (assignmentViewMode === "past") {
+    if (!pastAssignments.some((assignment) => assignment.id === selectedPastAssignmentId)) {
+      selectedPastAssignmentId = pastAssignments[0]?.id || "";
+    }
+    displayedAssignment = pastAssignments.find((assignment) => assignment.id === selectedPastAssignmentId);
+  }
+
+  selectedClassSummary.innerHTML = teacherSummaryHtml(displayedAssignment);
+
+  if (!displayedAssignment) {
+    list.innerHTML = `<p class="muted empty-focused-view">${assignmentViewMode === "past" ? "지난 과제가 없습니다." : "등록된 과제가 없습니다."}</p>`;
+    return;
+  }
+
+  const picker = assignmentViewMode === "past"
+    ? `
+      <label class="teacher-past-picker">
+        지난 과제 선택
+        <select id="teacherPastAssignmentSelect">
+          ${pastAssignments
+            .map((assignment) => `<option value="${escapeHtml(assignment.id)}" ${assignment.id === displayedAssignment.id ? "selected" : ""}>${escapeHtml(`${assignment.dateLabel} ${rangeLabel(assignment)}`)}</option>`)
+            .join("")}
+        </select>
+      </label>
+    `
+    : "";
+
+  list.innerHTML = `${picker}${assignmentCardHtml(displayedAssignment, { past: assignmentViewMode === "past" })}`;
+  const pastSelect = document.querySelector("#teacherPastAssignmentSelect");
+  if (pastSelect) {
+    pastSelect.addEventListener("change", () => {
+      selectedPastAssignmentId = pastSelect.value;
+      renderFocusedDashboard();
+    });
+  }
+  bindRenderedAssignmentActions();
+}
+
+function renderAssignments(assignments) {
+  const orderedAssignments = assignments.slice().sort((a, b) => compareByClassOrder(a, b) || b.createdAt.localeCompare(a.createdAt));
+  latestAssignments = orderedAssignments;
+  countBadge.textContent = `${orderedAssignments.length}개`;
+  renderClasses(orderedAssignments);
+
+  if (orderedAssignments.length === 0) {
+    teacherClassTabs.innerHTML = "";
+    selectedClassSummary.innerHTML = "";
+    list.innerHTML = `<p class="muted">아직 만든 과제가 없습니다.</p>`;
+    return;
+  }
+
+  const classes = groupedByClass(orderedAssignments).map((group) => group.className);
+  const scheduledClass = classForDay();
+  if (!classes.includes(selectedClassName)) {
+    selectedClassName = classes.includes(scheduledClass) ? scheduledClass : classes[0];
+  }
+  todayClassLabel.textContent = `${todayLabel()} · ${new Date().getDay() === 0 ? "다음 수업" : "오늘 수업"} ${shortClassName(scheduledClass)}`;
+  renderFocusedDashboard();
+}
+
 async function loadAssignments() {
   const payload = await api("/api/assignments");
   renderAssignments(payload.assignments);
@@ -489,4 +601,12 @@ form.addEventListener("submit", async (event) => {
 });
 
 refreshButton.addEventListener("click", loadAssignments);
+currentAssignmentTab.addEventListener("click", () => {
+  assignmentViewMode = "current";
+  renderFocusedDashboard();
+});
+pastAssignmentsTab.addEventListener("click", () => {
+  assignmentViewMode = "past";
+  renderFocusedDashboard();
+});
 loadAssignments();

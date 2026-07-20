@@ -12,13 +12,32 @@
         <div>
           <p class="eyebrow">선생님 화면</p>
           <h1>과제 질문 체크</h1>
+          <p id="todayClassLabel" class="muted teacher-day-label"></p>
         </div>
         <button class="ghost" id="refreshButton">새로고침</button>
       </section>
 
-      <section class="panel">
-        <details class="create-assignment">
-          <summary>새 과제 만들기</summary>
+      <section class="panel teacher-dashboard">
+        <div id="teacherClassTabs" class="teacher-class-tabs" role="tablist" aria-label="관리할 반"></div>
+        <div class="teacher-view-head">
+          <div>
+            <p id="selectedClassContext" class="eyebrow"></p>
+            <h2 id="selectedClassTitle">반을 불러오는 중</h2>
+          </div>
+          <div class="teacher-mode-tabs" role="tablist" aria-label="과제 구분">
+            <button id="currentAssignmentTab" class="teacher-mode-tab is-active" type="button" role="tab" aria-selected="true">이번 과제</button>
+            <button id="pastAssignmentsTab" class="teacher-mode-tab" type="button" role="tab" aria-selected="false">지난 과제</button>
+          </div>
+        </div>
+        <div id="selectedClassSummary" class="teacher-summary-strip"></div>
+        <div id="assignmentList" class="assignment-list focused-assignment-list"></div>
+      </section>
+
+      <section class="panel teacher-tools-panel">
+        <details class="compact-section">
+          <summary>관리 도구</summary>
+          <details class="create-assignment nested-tool">
+            <summary>새 과제 만들기</summary>
           <form id="assignmentForm" class="form-grid">
             <label>
               반 이름
@@ -64,25 +83,16 @@
             </label>
             <button class="primary" type="submit">과제 만들기</button>
           </form>
+          </details>
+          <details class="compact-section nested-tool">
+            <summary>
+              <span>반별 고정 링크</span>
+              <span id="classCount" class="badge">0개</span>
+            </summary>
+            <div id="classList" class="class-list"></div>
+          </details>
         </details>
-      </section>
-
-      <section class="panel">
-        <details class="compact-section">
-          <summary>
-            <span>반별 고정 링크</span>
-            <span id="classCount" class="badge">0개</span>
-          </summary>
-          <div id="classList" class="class-list"></div>
-        </details>
-      </section>
-
-      <section class="panel">
-        <div class="section-head">
-          <h2>과제 관리</h2>
-          <span id="assignmentCount" class="badge">0개</span>
-        </div>
-        <div id="assignmentList" class="assignment-list"></div>
+        <span id="assignmentCount" class="visually-hidden">0개</span>
       </section>
     </main>
 
