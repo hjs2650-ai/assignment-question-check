@@ -415,7 +415,7 @@ async function handleApi(req, res, pathname) {
     }
 
     const uploadedFiles = submittedFiles
-      .filter((file) => file && /^image\/(jpeg|png|webp)$/.test(file.mimeType))
+      .filter((file) => file && /^image\//.test(file.mimeType))
       .slice(0, 20)
       .map((file) => ({
         name: normalizeText(file.name) || "photo",
