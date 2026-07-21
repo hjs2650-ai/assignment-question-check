@@ -43,11 +43,20 @@
               <span id="checkedCount" class="badge">0개 선택</span>
             </div>
             <div id="problemGrid" class="check-grid"></div>
-            <label class="photo-upload">
-              과제 사진 첨부
-              <input id="photoFiles" type="file" accept="image/*" multiple />
-              <span class="muted">사진 파일은 보관하지 않고 첨부 여부만 기록됩니다.</span>
-            </label>
+            <div class="photo-upload">
+              <strong>과제 사진 첨부</strong>
+              <div class="photo-actions">
+                <label class="photo-picker">
+                  앨범에서 여러 장 선택
+                  <input id="photoFiles" type="file" accept="image/*" multiple />
+                </label>
+                <label class="photo-picker camera">
+                  카메라로 한 장 찍기
+                  <input id="photoCamera" type="file" accept="image/*" capture="environment" />
+                </label>
+              </div>
+              <span class="muted">최대 20장까지 계속 추가할 수 있으며, 사진 파일은 보관하지 않고 첨부 여부만 기록됩니다.</span>
+            </div>
             <div id="photoList" class="photo-list"></div>
             <button class="primary full" type="submit">오늘 과제 제출하기</button>
             <p id="message" class="message"></p>
@@ -68,11 +77,20 @@
               </div>
               <div id="pastProblemGrid" class="check-grid past-check-grid"></div>
             </section>
-            <label class="photo-upload">
-              지난과제 사진 첨부
-              <input id="pastPhotoFiles" type="file" accept="image/*" multiple />
-              <span class="muted">선택한 날짜의 과제 제출로 기록됩니다.</span>
-            </label>
+            <div class="photo-upload">
+              <strong>지난과제 사진 첨부</strong>
+              <div class="photo-actions">
+                <label class="photo-picker">
+                  앨범에서 여러 장 선택
+                  <input id="pastPhotoFiles" type="file" accept="image/*" multiple />
+                </label>
+                <label class="photo-picker camera">
+                  카메라로 한 장 찍기
+                  <input id="pastPhotoCamera" type="file" accept="image/*" capture="environment" />
+                </label>
+              </div>
+              <span class="muted">최대 20장까지 계속 추가할 수 있으며, 선택한 날짜의 과제 제출로 기록됩니다.</span>
+            </div>
             <div id="pastPhotoList" class="photo-list"></div>
             <button id="pastSubmitBtn" class="secondary full" type="button">지난과제 제출하기</button>
             <p id="pastMessage" class="message"></p>

@@ -12,6 +12,7 @@ const nameInput = document.querySelector("#studentName");
 const checkedCount = document.querySelector("#checkedCount");
 const message = document.querySelector("#message");
 const photoInput = document.querySelector("#photoFiles");
+const photoCameraInput = document.querySelector("#photoCamera");
 const photoList = document.querySelector("#photoList");
 const submissionTabs = document.querySelector("#submissionTabs");
 const currentSubmissionTab = document.querySelector("#currentSubmissionTab");
@@ -23,6 +24,7 @@ const pastProblemWrap = document.querySelector("#pastProblemWrap");
 const pastProblemGrid = document.querySelector("#pastProblemGrid");
 const pastCheckedCount = document.querySelector("#pastCheckedCount");
 const pastPhotoInput = document.querySelector("#pastPhotoFiles");
+const pastPhotoCameraInput = document.querySelector("#pastPhotoCamera");
 const pastPhotoList = document.querySelector("#pastPhotoList");
 const pastSubmitBtn = document.querySelector("#pastSubmitBtn");
 const pastMessage = document.querySelector("#pastMessage");
@@ -141,6 +143,10 @@ function fileKey(file) {
   return [file.name, file.size, file.lastModified].join(":");
 }
 
+function isImageFile(file) {
+  return file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+}
+
 function renderSelectedPhotos(files, list) {
   list.innerHTML = files.length
     ? files.map((file) => `<span>${file.name}</span>`).join("")
@@ -149,7 +155,7 @@ function renderSelectedPhotos(files, list) {
 
 function addSelectedPhotos(input, selectedFiles, list) {
   const existingKeys = new Set(selectedFiles.map(fileKey));
-  const incomingFiles = [...input.files].filter((file) => file.type.startsWith("image/"));
+  const incomingFiles = [...input.files].filter(isImageFile);
 
   for (const file of incomingFiles) {
     if (selectedFiles.length >= MAX_PHOTOS) {
@@ -167,10 +173,10 @@ function addSelectedPhotos(input, selectedFiles, list) {
 }
 
 async function selectedPhotosPayload(files) {
-  const selectedFiles = files.filter((file) => file.type.startsWith("image/")).slice(0, MAX_PHOTOS);
+  const selectedFiles = files.filter(isImageFile).slice(0, MAX_PHOTOS);
   return selectedFiles.map((file) => ({
     name: file.name,
-    mimeType: file.type || "image/jpeg",
+    mimeType: file.type.startsWith("image/") ? file.type : "image/jpeg",
   }));
 }
 
@@ -265,6 +271,7 @@ form.addEventListener("submit", async (event) => {
     });
     currentPhotoFiles = [];
     photoInput.value = "";
+    photoCameraInput.value = "";
     renderSelectedPhotos(currentPhotoFiles, photoList);
     message.className = "message success";
     message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.</span>";
@@ -319,6 +326,7 @@ async function submitPastAssignment() {
     });
     pastPhotoFiles = [];
     pastPhotoInput.value = "";
+    pastPhotoCameraInput.value = "";
     renderSelectedPhotos(pastPhotoFiles, pastPhotoList);
     pastMessage.className = "message success";
     pastMessage.innerHTML = `<strong>지난과제 제출 완료되었습니다.</strong><span>${escapeHtml(selected?.dateLabel || "선택한 날짜")} 과제 제출로 기록되었습니다.</span>`;
@@ -328,7 +336,9 @@ async function submitPastAssignment() {
 }
 
 photoInput.addEventListener("change", () => addSelectedPhotos(photoInput, currentPhotoFiles, photoList));
+photoCameraInput.addEventListener("change", () => addSelectedPhotos(photoCameraInput, currentPhotoFiles, photoList));
 pastPhotoInput.addEventListener("change", () => addSelectedPhotos(pastPhotoInput, pastPhotoFiles, pastPhotoList));
+pastPhotoCameraInput.addEventListener("change", () => addSelectedPhotos(pastPhotoCameraInput, pastPhotoFiles, pastPhotoList));
 currentSubmissionTab.addEventListener("click", () => setSubmissionMode("current"));
 pastSubmissionTab.addEventListener("click", () => setSubmissionMode("past"));
 grid.addEventListener("change", updateCount);
