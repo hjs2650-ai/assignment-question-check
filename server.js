@@ -330,6 +330,32 @@ async function handleApi(req, res, pathname) {
     return;
   }
 
+  const classStatusMatch = pathname.match(/^\/api\/classes\/([^/]+)\/status$/);
+  if (req.method === "GET" && classStatusMatch) {
+    const className = decodeURIComponent(classStatusMatch[1]);
+    const studentName = normalizeText(new URL(req.url, "http://localhost").searchParams.get("studentName"));
+    const classStudents = studentsForClass(data, className);
+
+    if (!studentName || !classStudents.includes(studentName)) {
+      sendJson(res, 404, { error: "반 명단에서 이름을 확인할 수 없습니다. 이름을 정확히 입력해 주세요." });
+      return;
+    }
+
+    const targetClass = normalizeClassName(className);
+    const assignments = data.assignments
+      .filter((assignment) => normalizeClassName(assignment.className) === targetClass)
+      .filter((assignment) => studentsForAssignment(data, assignment).includes(studentName))
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((assignment) => ({
+        ...publicAssignment(assignment),
+        submitted: (assignment.responses || []).some((response) => response.studentName === studentName),
+      }));
+
+    sendJson(res, 200, { studentName, assignments });
+    return;
+  }
+
   if (req.method === "GET" && pathname === "/api/assignments") {
     sendJson(res, 200, {
       assignments: data.assignments
