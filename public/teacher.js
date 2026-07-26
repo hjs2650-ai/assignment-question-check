@@ -270,24 +270,27 @@ function studentMissingNotice(assignment, student) {
   ].join("\n");
 }
 
-function monthDayKey(value) {
+function assignmentStartDate(assignment) {
+  const value = assignment.dateLabel;
   const match = String(value || "").match(/(\d{1,2})\s*\/\s*(\d{1,2})/);
-  return match ? Number(match[1]) * 100 + Number(match[2]) : 0;
-}
-
-function assignmentDueKey(assignment) {
-  const deadline = String(assignment.title || "").match(/\((\d{1,2}\s*\/\s*\d{1,2})까지\)/);
-  return monthDayKey(deadline ? deadline[1] : assignment.dateLabel);
-}
-
-function todayMonthDayKey() {
-  const today = new Date();
-  return (today.getMonth() + 1) * 100 + today.getDate();
+  if (!match) {
+    return null;
+  }
+  const createdAt = new Date(assignment.createdAt);
+  const year = Number.isNaN(createdAt.getTime()) ? new Date().getFullYear() : createdAt.getFullYear();
+  return new Date(year, Number(match[1]) - 1, Number(match[2]));
 }
 
 function isDueAssignment(assignment) {
-  const dueKey = assignmentDueKey(assignment);
-  return dueKey > 0 && dueKey <= todayMonthDayKey();
+  const startDate = assignmentStartDate(assignment);
+  if (!startDate) {
+    return false;
+  }
+  const visibleFrom = new Date(startDate);
+  visibleFrom.setDate(visibleFrom.getDate() + 6);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return visibleFrom <= today;
 }
 
 function cumulativeMissingRows(assignments) {
@@ -306,7 +309,7 @@ function cumulativeMissingRows(assignments) {
   return [...rows.entries()]
     .map(([student, missingAssignments]) => ({
       student,
-      assignments: missingAssignments.sort((a, b) => monthDayKey(a.dateLabel) - monthDayKey(b.dateLabel)),
+      assignments: missingAssignments.sort((a, b) => assignmentStartDate(a) - assignmentStartDate(b)),
     }))
     .sort((a, b) => a.student.localeCompare(b.student, "ko"));
 }
@@ -655,7 +658,7 @@ function renderFocusedDashboard() {
     selectedClassSummary.innerHTML = `
       <div><span>대상 학생</span><strong>${rows.length}명</strong></div>
       <div class="summary-missing"><span>누적 미제출</span><strong>${totalMissing}건</strong></div>
-      <div><span>확인 기준</span><strong>기한 지난 과제</strong></div>
+      <div><span>확인 기준</span><strong>과제 시작 +6일</strong></div>
     `;
     list.innerHTML = cumulativeMissingHtml(assignments);
     bindRenderedAssignmentActions();
