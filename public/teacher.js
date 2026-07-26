@@ -9,6 +9,7 @@ const classOptions = document.querySelector("#classOptions");
 const teacherClassTabs = document.querySelector("#teacherClassTabs");
 const currentAssignmentTab = document.querySelector("#currentAssignmentTab");
 const pastAssignmentsTab = document.querySelector("#pastAssignmentsTab");
+const cumulativeMissingTab = document.querySelector("#cumulativeMissingTab");
 const selectedClassTitle = document.querySelector("#selectedClassTitle");
 const selectedClassContext = document.querySelector("#selectedClassContext");
 const selectedClassSummary = document.querySelector("#selectedClassSummary");
@@ -269,6 +270,108 @@ function studentMissingNotice(assignment, student) {
   ].join("\n");
 }
 
+function monthDayKey(value) {
+  const match = String(value || "").match(/(\d{1,2})\s*\/\s*(\d{1,2})/);
+  return match ? Number(match[1]) * 100 + Number(match[2]) : 0;
+}
+
+function assignmentDueKey(assignment) {
+  const deadline = String(assignment.title || "").match(/\((\d{1,2}\s*\/\s*\d{1,2})까지\)/);
+  return monthDayKey(deadline ? deadline[1] : assignment.dateLabel);
+}
+
+function todayMonthDayKey() {
+  const today = new Date();
+  return (today.getMonth() + 1) * 100 + today.getDate();
+}
+
+function isDueAssignment(assignment) {
+  const dueKey = assignmentDueKey(assignment);
+  return dueKey > 0 && dueKey <= todayMonthDayKey();
+}
+
+function cumulativeMissingRows(assignments) {
+  const rows = new Map();
+  assignments
+    .filter(isDueAssignment)
+    .forEach((assignment) => {
+      missingStudents(assignment).forEach((student) => {
+        if (!rows.has(student)) {
+          rows.set(student, []);
+        }
+        rows.get(student).push(assignment);
+      });
+    });
+
+  return [...rows.entries()]
+    .map(([student, missingAssignments]) => ({
+      student,
+      assignments: missingAssignments.sort((a, b) => monthDayKey(a.dateLabel) - monthDayKey(b.dateLabel)),
+    }))
+    .sort((a, b) => a.student.localeCompare(b.student, "ko"));
+}
+
+function cumulativeAssignmentLine(assignment) {
+  return `${noticeTitle(assignment)} · ${rangeLabel(assignment)}`;
+}
+
+function cumulativeParentNotice(student, assignments) {
+  return [
+    `${parentName(student)}, 안녕하세요. 황종선T입니다.`,
+    `지금까지 과제 제출 현황을 확인하는 중 미제출 과제가 있어 안내드립니다.`,
+    "",
+    "[미제출 과제]",
+    ...assignments.map((assignment) => `- ${cumulativeAssignmentLine(assignment)}`),
+    "",
+    `완료한 과제가 있다면 과제 체크 링크의 '지난 과제 제출'에서 사진 첨부 부탁드립니다.`,
+    `감사합니다.`,
+  ].join("\n");
+}
+
+function cumulativeStudentNotice(student, assignments) {
+  return [
+    `${friendlyStudentName(student)}, 지금까지 사진 제출이 확인되지 않은 과제가 있어 알려줄게.`,
+    "",
+    "[미제출 과제]",
+    ...assignments.map((assignment) => `- ${cumulativeAssignmentLine(assignment)}`),
+    "",
+    `완료한 과제는 과제 체크 링크의 '지난 과제 제출'에서 사진만 올려줘.`,
+  ].join("\n");
+}
+
+function cumulativeMissingHtml(assignments) {
+  const rows = cumulativeMissingRows(assignments);
+  if (!rows.length) {
+    return `<p class="muted empty-focused-view">누적 미제출 과제가 없습니다.</p>`;
+  }
+
+  return `
+    <div class="cumulative-missing-list">
+      ${rows
+        .map(
+          ({ student, assignments: missingAssignments }) => `
+            <article class="cumulative-missing-row">
+              <div class="cumulative-missing-head">
+                <div>
+                  <strong>${escapeHtml(student)}</strong>
+                  <span>${missingAssignments.length}건 미제출</span>
+                </div>
+                <div class="actions mini-actions">
+                  <button class="copy-cumulative-parent" type="button" data-student="${escapeHtml(student)}">어머님용 복사</button>
+                  <button class="copy-cumulative-student" type="button" data-student="${escapeHtml(student)}">학생용 복사</button>
+                </div>
+              </div>
+              <ul>
+                ${missingAssignments.map((assignment) => `<li>${escapeHtml(cumulativeAssignmentLine(assignment))}</li>`).join("")}
+              </ul>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function missingNoticeHtml(assignment) {
   const missing = missingStudents(assignment);
   if (!missing.length) {
@@ -468,6 +571,26 @@ function bindRenderedAssignmentActions() {
       }
     });
   });
+
+  list.querySelectorAll(".copy-cumulative-parent").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const group = groupedByClass(latestAssignments).find((item) => item.className === selectedClassName);
+      const row = cumulativeMissingRows(group?.assignments || []).find((item) => item.student === event.currentTarget.dataset.student);
+      if (row) {
+        copyToClipboard(cumulativeParentNotice(row.student, row.assignments), event.currentTarget, "어머님용 복사");
+      }
+    });
+  });
+
+  list.querySelectorAll(".copy-cumulative-student").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const group = groupedByClass(latestAssignments).find((item) => item.className === selectedClassName);
+      const row = cumulativeMissingRows(group?.assignments || []).find((item) => item.student === event.currentTarget.dataset.student);
+      if (row) {
+        copyToClipboard(cumulativeStudentNotice(row.student, row.assignments), event.currentTarget, "학생용 복사");
+      }
+    });
+  });
 }
 
 function renderTeacherClassTabs(classes) {
@@ -521,8 +644,23 @@ function renderFocusedDashboard() {
   selectedClassContext.textContent = contextLabel;
   currentAssignmentTab.classList.toggle("is-active", assignmentViewMode === "current");
   pastAssignmentsTab.classList.toggle("is-active", assignmentViewMode === "past");
+  cumulativeMissingTab.classList.toggle("is-active", assignmentViewMode === "missing");
   currentAssignmentTab.setAttribute("aria-selected", String(assignmentViewMode === "current"));
   pastAssignmentsTab.setAttribute("aria-selected", String(assignmentViewMode === "past"));
+  cumulativeMissingTab.setAttribute("aria-selected", String(assignmentViewMode === "missing"));
+
+  if (assignmentViewMode === "missing") {
+    const rows = cumulativeMissingRows(assignments);
+    const totalMissing = rows.reduce((sum, row) => sum + row.assignments.length, 0);
+    selectedClassSummary.innerHTML = `
+      <div><span>대상 학생</span><strong>${rows.length}명</strong></div>
+      <div class="summary-missing"><span>누적 미제출</span><strong>${totalMissing}건</strong></div>
+      <div><span>확인 기준</span><strong>기한 지난 과제</strong></div>
+    `;
+    list.innerHTML = cumulativeMissingHtml(assignments);
+    bindRenderedAssignmentActions();
+    return;
+  }
 
   let displayedAssignment = currentAssignment;
   if (assignmentViewMode === "past") {
@@ -607,6 +745,10 @@ currentAssignmentTab.addEventListener("click", () => {
 });
 pastAssignmentsTab.addEventListener("click", () => {
   assignmentViewMode = "past";
+  renderFocusedDashboard();
+});
+cumulativeMissingTab.addEventListener("click", () => {
+  assignmentViewMode = "missing";
   renderFocusedDashboard();
 });
 loadAssignments();

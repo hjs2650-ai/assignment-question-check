@@ -32,6 +32,14 @@
             이름
             <input id="studentName" placeholder="예: 홍길동" autocomplete="name" required />
           </label>
+          <section id="studentMissingCheck" class="student-missing-check">
+            <div>
+              <strong>내 미제출 과제</strong>
+              <span class="muted">이름을 입력하면 제출하지 않은 지난 과제를 확인할 수 있어요.</span>
+            </div>
+            <button id="checkMissingBtn" class="ghost" type="button">확인하기</button>
+          </section>
+          <div id="studentMissingResult" class="student-missing-result" hidden></div>
           <div id="submissionTabs" class="submission-tabs" role="tablist" aria-label="과제 제출 종류">
             <button id="currentSubmissionTab" class="submission-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="currentSubmissionPanel">오늘 과제 제출</button>
             <button id="pastSubmissionTab" class="submission-tab" type="button" role="tab" aria-selected="false" aria-controls="pastAssignmentWrap">지난 과제 제출</button>

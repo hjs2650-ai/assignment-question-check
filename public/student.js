@@ -28,6 +28,9 @@ const pastPhotoCameraInput = document.querySelector("#pastPhotoCamera");
 const pastPhotoList = document.querySelector("#pastPhotoList");
 const pastSubmitBtn = document.querySelector("#pastSubmitBtn");
 const pastMessage = document.querySelector("#pastMessage");
+const studentMissingCheck = document.querySelector("#studentMissingCheck");
+const checkMissingBtn = document.querySelector("#checkMissingBtn");
+const studentMissingResult = document.querySelector("#studentMissingResult");
 
 let assignmentId = routeType === "student" ? routeValue : "";
 let availableAssignments = [];
@@ -124,6 +127,83 @@ function pastAssignmentOptionLabel(assignment) {
   return `${displayDateLabel(assignment.dateLabel)} ${assignment.rangeLabel || assignment.title}`;
 }
 
+function renderStudentMissingAssignments(assignments) {
+  const missing = assignments.filter((assignment) => !assignment.submitted && assignment.id !== assignmentId);
+  studentMissingResult.hidden = false;
+
+  if (!missing.length) {
+    studentMissingResult.innerHTML = `
+      <div class="student-missing-clear">
+        <strong>확인 완료</strong>
+        <span>미제출로 남아 있는 지난 과제가 없어요.</span>
+      </div>
+    `;
+    return;
+  }
+
+  studentMissingResult.innerHTML = `
+    <div class="student-missing-title">
+      <strong>미제출 지난 과제 ${missing.length}건</strong>
+      <span>완료한 과제는 사진을 첨부해 제출해 주세요.</span>
+    </div>
+    <div class="student-missing-items">
+      ${missing
+        .map(
+          (assignment) => `
+            <div class="student-missing-item">
+              <div>
+                <strong>${escapeHtml(displayDateLabel(assignment.dateLabel))} 과제</strong>
+                <span>${escapeHtml(assignment.rangeLabel || assignment.title)}</span>
+              </div>
+              <button class="open-missing-assignment" type="button" data-id="${escapeHtml(assignment.id)}">지금 제출하기</button>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+
+  studentMissingResult.querySelectorAll(".open-missing-assignment").forEach((button) => {
+    button.addEventListener("click", () => {
+      const selected = availableAssignments.find((assignment) => assignment.id === button.dataset.id);
+      if (!selected) {
+        return;
+      }
+      setSubmissionMode("past");
+      pastAssignmentSelect.value = selected.id;
+      renderPastProblems(selected);
+      pastMessage.textContent = "";
+      pastMessage.className = "message";
+      pastAssignmentWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+}
+
+async function loadStudentMissingStatus() {
+  const studentName = nameInput.value.trim();
+  if (!studentName) {
+    studentMissingResult.hidden = false;
+    studentMissingResult.innerHTML = `<p class="message error">이름을 먼저 입력해 주세요.</p>`;
+    nameInput.focus();
+    return;
+  }
+
+  checkMissingBtn.disabled = true;
+  checkMissingBtn.textContent = "확인 중";
+  try {
+    const payload = await api(
+      `/api/classes/${encodeURIComponent(routeValue)}/status?studentName=${encodeURIComponent(studentName)}`,
+    );
+    renderStudentMissingAssignments(payload.assignments || []);
+  } catch (error) {
+    studentMissingResult.hidden = false;
+    studentMissingResult.innerHTML = `<p class="message error">${escapeHtml(error.message)}</p>`;
+  } finally {
+    checkMissingBtn.disabled = false;
+    checkMissingBtn.textContent = "확인하기";
+  }
+}
+
 function setSubmissionMode(mode) {
   if (mode === "past" && routeType !== "class") {
     return;
@@ -197,6 +277,8 @@ function renderPastAssignmentSelector(assignments) {
   if (routeType !== "class") {
     submissionTabs.hidden = true;
     pastAssignmentWrap.hidden = true;
+    studentMissingCheck.hidden = true;
+    studentMissingResult.hidden = true;
     return;
   }
 
@@ -330,6 +412,7 @@ async function submitPastAssignment() {
     renderSelectedPhotos(pastPhotoFiles, pastPhotoList);
     pastMessage.className = "message success";
     pastMessage.innerHTML = `<strong>지난과제 제출 완료되었습니다.</strong><span>${escapeHtml(selected?.dateLabel || "선택한 날짜")} 과제 제출로 기록되었습니다.</span>`;
+    await loadStudentMissingStatus();
   } finally {
     pastSubmitBtn.disabled = !pastAssignmentSelect.value;
   }
@@ -355,6 +438,11 @@ pastSubmitBtn.addEventListener("click", () => {
     pastMessage.className = "message error";
     pastMessage.textContent = error.message;
   });
+});
+checkMissingBtn.addEventListener("click", loadStudentMissingStatus);
+nameInput.addEventListener("input", () => {
+  studentMissingResult.hidden = true;
+  studentMissingResult.innerHTML = "";
 });
 
 loadAssignment().catch((error) => {
