@@ -332,8 +332,29 @@ function cumulativeParentNotice(student, assignments) {
 }
 
 function cumulativeStudentNotice(student, assignments) {
+  const count = assignments.length;
+  let message;
+
+  if (count === 1) {
+    message = [
+      `${friendlyStudentName(student)}, 아직 제출하지 않은 과제가 하나 있어.`,
+      `깜빡했을 수 있으니까 확인하고 사진 올려줘!`,
+    ];
+  } else if (count === 2) {
+    message = [
+      `${friendlyStudentName(student)}, 지금 밀린 과제가 ${count}개 있어.`,
+      `더 쌓이기 전에 오늘 하나라도 꼭 끝내서 제출하자!`,
+    ];
+  } else {
+    message = [
+      `${friendlyStudentName(student)}, 현재 제출하지 않은 과제가 ${count}개나 쌓여 있어.`,
+      `더 미루면 따라잡기 힘들어져. 오늘 가장 오래된 과제부터 시작해서 끝낸 건 바로 사진 올려줘.`,
+      `아무런 제출이나 연락이 없으면 과제 진행 상황을 부모님께도 안내할게.`,
+    ];
+  }
+
   return [
-    `${friendlyStudentName(student)}, 지금까지 사진 제출이 확인되지 않은 과제가 있어 알려줄게.`,
+    ...message,
     "",
     "[미제출 과제]",
     ...assignments.map((assignment) => `- ${cumulativeAssignmentLine(assignment)}`),
