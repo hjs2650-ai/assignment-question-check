@@ -359,7 +359,7 @@ function cumulativeStudentNotice(student, assignments) {
     "[미제출 과제]",
     ...assignments.map((assignment) => `- ${cumulativeAssignmentLine(assignment)}`),
     "",
-    `완료한 과제는 과제 체크 링크의 '지난 과제 제출'에서 사진만 올려줘.`,
+    `끝낸 과제는 과제 체크 링크의 '지난 과제 제출'에 바로 올려주면 돼!`,
   ].join("\n");
 }
 
