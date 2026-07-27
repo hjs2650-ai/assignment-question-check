@@ -10,6 +10,7 @@ const form = document.querySelector("#responseForm");
 const submitButton = form.querySelector('button[type="submit"]');
 const nameInput = document.querySelector("#studentName");
 const checkedCount = document.querySelector("#checkedCount");
+const noQuestionInput = document.querySelector("#noQuestion");
 const message = document.querySelector("#message");
 const photoInput = document.querySelector("#photoFiles");
 const photoCameraInput = document.querySelector("#photoCamera");
@@ -23,6 +24,7 @@ const pastAssignmentSelect = document.querySelector("#pastAssignmentSelect");
 const pastProblemWrap = document.querySelector("#pastProblemWrap");
 const pastProblemGrid = document.querySelector("#pastProblemGrid");
 const pastCheckedCount = document.querySelector("#pastCheckedCount");
+const pastNoQuestionInput = document.querySelector("#pastNoQuestion");
 const pastPhotoInput = document.querySelector("#pastPhotoFiles");
 const pastPhotoCameraInput = document.querySelector("#pastPhotoCamera");
 const pastPhotoList = document.querySelector("#pastPhotoList");
@@ -53,12 +55,18 @@ async function api(path, options = {}) {
 
 function updateCount() {
   const count = grid.querySelectorAll("input:checked").length;
-  checkedCount.textContent = `${count}개 선택`;
+  checkedCount.textContent = noQuestionInput.checked ? "질문 없음" : `${count}개 선택`;
 }
 
 function updatePastCount() {
   const count = pastProblemGrid.querySelectorAll("input:checked").length;
-  pastCheckedCount.textContent = `${count}개 선택`;
+  pastCheckedCount.textContent = pastNoQuestionInput.checked ? "질문 없음" : `${count}개 선택`;
+}
+
+function clearProblemChecks(targetGrid) {
+  targetGrid.querySelectorAll('input[type="checkbox"]:checked').forEach((input) => {
+    input.checked = false;
+  });
 }
 
 function escapeHtml(value) {
@@ -127,40 +135,75 @@ function pastAssignmentOptionLabel(assignment) {
   return `${displayDateLabel(assignment.dateLabel)} ${assignment.rangeLabel || assignment.title}`;
 }
 
+function submittedQuestionText(assignment) {
+  const selected = Array.isArray(assignment.checkedProblems) ? assignment.checkedProblems : [];
+  if (selected.length) {
+    const labels = new Map((assignment.items || []).map((item) => [String(item.id), item.label]));
+    return selected.map((problem) => labels.get(String(problem)) || `${problem}번`).join(", ");
+  }
+  return assignment.noQuestionsConfirmed ? "질문할 문제 없음으로 제출" : "질문 선택 확인 기록 없음";
+}
+
 function renderStudentMissingAssignments(assignments) {
   const missing = assignments.filter((assignment) => !assignment.submitted && assignment.id !== assignmentId);
+  const submitted = assignments.filter((assignment) => assignment.submitted);
   studentMissingResult.hidden = false;
 
-  if (!missing.length) {
-    studentMissingResult.innerHTML = `
-      <div class="student-missing-clear">
-        <strong>확인 완료</strong>
-        <span>미제출로 남아 있는 지난 과제가 없어요.</span>
-      </div>
-    `;
-    return;
-  }
-
   studentMissingResult.innerHTML = `
-    <div class="student-missing-title">
-      <strong>미제출 지난 과제 ${missing.length}건</strong>
-      <span>완료한 과제는 사진을 첨부해 제출해 주세요.</span>
-    </div>
-    <div class="student-missing-items">
-      ${missing
-        .map(
-          (assignment) => `
-            <div class="student-missing-item">
-              <div>
-                <strong>${escapeHtml(displayDateLabel(assignment.dateLabel))} 과제</strong>
-                <span>${escapeHtml(assignment.rangeLabel || assignment.title)}</span>
+    ${
+      missing.length
+        ? `
+          <div class="student-missing-title">
+            <strong>미제출 지난 과제 ${missing.length}건</strong>
+            <span>완료한 과제는 사진을 첨부해 제출해 주세요.</span>
+          </div>
+          <div class="student-missing-items">
+            ${missing
+              .map(
+                (assignment) => `
+                  <div class="student-missing-item">
+                    <div>
+                      <strong>${escapeHtml(displayDateLabel(assignment.dateLabel))} 과제</strong>
+                      <span>${escapeHtml(assignment.rangeLabel || assignment.title)}</span>
+                    </div>
+                    <button class="open-missing-assignment" type="button" data-id="${escapeHtml(assignment.id)}">지금 제출하기</button>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+        `
+        : `
+          <div class="student-missing-clear">
+            <strong>미제출 과제 확인 완료</strong>
+            <span>미제출로 남아 있는 지난 과제가 없어요.</span>
+          </div>
+        `
+    }
+    <section class="student-question-history">
+      <div class="student-missing-title">
+        <strong>내가 체크한 질문</strong>
+        <span>제출한 과제별 질문 번호를 확인할 수 있어요.</span>
+      </div>
+      ${
+        submitted.length
+          ? `
+            <div class="student-question-items">
+              ${submitted
+                .map(
+                  (assignment) => `
+                    <div class="student-question-item">
+                      <strong>${escapeHtml(displayDateLabel(assignment.dateLabel))} 과제</strong>
+                      <span>${escapeHtml(submittedQuestionText(assignment))}</span>
+                    </div>
+                  `,
+                )
+                .join("")}
               </div>
-              <button class="open-missing-assignment" type="button" data-id="${escapeHtml(assignment.id)}">지금 제출하기</button>
-            </div>
-          `,
-        )
-        .join("")}
-    </div>
+          `
+          : `<p class="muted">아직 제출한 과제가 없어요.</p>`
+      }
+    </section>
   `;
 
   studentMissingResult.querySelectorAll(".open-missing-assignment").forEach((button) => {
@@ -269,6 +312,7 @@ function showAssignment(assignment) {
   rangeText.textContent = assignment.rangeLabel || `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
   detail.textContent = "질문하고 싶은 문제들을 체크하고, 과제 사진은 첨부해 주세요.";
   renderProblems(assignment);
+  noQuestionInput.checked = false;
   updateCount();
 }
 
@@ -308,12 +352,14 @@ function renderPastProblems(assignment) {
   if (!assignment) {
     pastProblemWrap.hidden = true;
     pastProblemGrid.innerHTML = "";
+    pastNoQuestionInput.checked = false;
     updatePastCount();
     return;
   }
 
   pastProblemWrap.hidden = false;
   renderProblemsInto(assignment, pastProblemGrid);
+  pastNoQuestionInput.checked = false;
   updatePastCount();
 }
 
@@ -337,17 +383,41 @@ async function loadAssignment() {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   message.className = "message";
+  const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
+  const noQuestionsConfirmed = noQuestionInput.checked;
+
+  if (!problems.length && !noQuestionsConfirmed) {
+    message.className = "message error";
+    message.textContent = "질문할 문제를 선택해 주세요. 질문이 없다면 '질문할 문제 없음'을 체크해 주세요.";
+    return;
+  }
+
+  const files = await selectedPhotosPayload(currentPhotoFiles);
+  if (!files.length) {
+    message.className = "message error";
+    message.textContent = "과제 사진을 한 장 이상 첨부해 주세요.";
+    return;
+  }
+
+  if (
+    noQuestionsConfirmed &&
+    !window.confirm("정말로 질문 없이 제출하시겠습니까?\n질문할 문제가 있다면 취소하고 문제 번호를 선택해 주세요.")
+  ) {
+    message.className = "message";
+    message.textContent = "문제 번호를 다시 확인해 주세요.";
+    return;
+  }
+
   message.textContent = "제출 중입니다.";
   submitButton.disabled = true;
 
   try {
-    const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
-    const files = await selectedPhotosPayload(currentPhotoFiles);
     await api(`/api/assignments/${assignmentId}/responses`, {
       method: "POST",
       body: JSON.stringify({
         studentName: nameInput.value,
         problems,
+        noQuestionsConfirmed,
         files,
       }),
     });
@@ -373,6 +443,7 @@ async function submitPastAssignment() {
   const selectedAssignmentId = pastAssignmentSelect.value;
   const files = await selectedPhotosPayload(pastPhotoFiles);
   const problems = [...pastProblemGrid.querySelectorAll("input:checked")].map((input) => input.value);
+  const noQuestionsConfirmed = pastNoQuestionInput.checked;
 
   if (!studentName) {
     pastMessage.className = "message error";
@@ -387,9 +458,24 @@ async function submitPastAssignment() {
     return;
   }
 
+  if (!problems.length && !noQuestionsConfirmed) {
+    pastMessage.className = "message error";
+    pastMessage.textContent = "질문할 문제를 선택해 주세요. 질문이 없다면 '질문할 문제 없음'을 체크해 주세요.";
+    return;
+  }
+
   if (!files.length) {
     pastMessage.className = "message error";
     pastMessage.textContent = "지난과제 사진을 첨부해 주세요.";
+    return;
+  }
+
+  if (
+    noQuestionsConfirmed &&
+    !window.confirm("정말로 질문 없이 제출하시겠습니까?\n질문할 문제가 있다면 취소하고 문제 번호를 선택해 주세요.")
+  ) {
+    pastMessage.className = "message";
+    pastMessage.textContent = "문제 번호를 다시 확인해 주세요.";
     return;
   }
 
@@ -403,7 +489,8 @@ async function submitPastAssignment() {
       body: JSON.stringify({
         studentName,
         files,
-        ...(problems.length ? { problems } : { keepProblems: true }),
+        problems,
+        noQuestionsConfirmed,
       }),
     });
     pastPhotoFiles = [];
@@ -424,8 +511,30 @@ pastPhotoInput.addEventListener("change", () => addSelectedPhotos(pastPhotoInput
 pastPhotoCameraInput.addEventListener("change", () => addSelectedPhotos(pastPhotoCameraInput, pastPhotoFiles, pastPhotoList));
 currentSubmissionTab.addEventListener("click", () => setSubmissionMode("current"));
 pastSubmissionTab.addEventListener("click", () => setSubmissionMode("past"));
-grid.addEventListener("change", updateCount);
-pastProblemGrid.addEventListener("change", updatePastCount);
+grid.addEventListener("change", (event) => {
+  if (event.target.matches('input[type="checkbox"]') && event.target.checked) {
+    noQuestionInput.checked = false;
+  }
+  updateCount();
+});
+pastProblemGrid.addEventListener("change", (event) => {
+  if (event.target.matches('input[type="checkbox"]') && event.target.checked) {
+    pastNoQuestionInput.checked = false;
+  }
+  updatePastCount();
+});
+noQuestionInput.addEventListener("change", () => {
+  if (noQuestionInput.checked) {
+    clearProblemChecks(grid);
+  }
+  updateCount();
+});
+pastNoQuestionInput.addEventListener("change", () => {
+  if (pastNoQuestionInput.checked) {
+    clearProblemChecks(pastProblemGrid);
+  }
+  updatePastCount();
+});
 pastAssignmentSelect.addEventListener("change", () => {
   pastMessage.textContent = "";
   pastMessage.className = "message";

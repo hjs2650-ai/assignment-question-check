@@ -347,10 +347,15 @@ async function handleApi(req, res, pathname) {
       .filter((assignment) => studentsForAssignment(data, assignment).includes(studentName))
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((assignment) => ({
-        ...publicAssignment(assignment),
-        submitted: (assignment.responses || []).some((response) => response.studentName === studentName),
-      }));
+      .map((assignment) => {
+        const response = (assignment.responses || []).find((item) => item.studentName === studentName);
+        return {
+          ...publicAssignment(assignment),
+          submitted: Boolean(response),
+          checkedProblems: response ? response.problems : [],
+          noQuestionsConfirmed: Boolean(response && response.noQuestionsConfirmed),
+        };
+      });
 
     sendJson(res, 200, { studentName, assignments });
     return;
@@ -431,12 +436,23 @@ async function handleApi(req, res, pathname) {
     const studentName = normalizeText(body.studentName);
     const hasProblemPayload = Array.isArray(body.problems);
     const checked = hasProblemPayload ? body.problems.map(String) : [];
+    const noQuestionsConfirmed = body.noQuestionsConfirmed === true;
     const submittedFiles = Array.isArray(body.files) ? body.files : [];
     const validSet = new Set(assignment.problems);
     const problems = [...new Set(checked)].filter((problem) => validSet.has(problem));
 
     if (!studentName) {
       sendJson(res, 400, { error: "이름을 입력해 주세요." });
+      return;
+    }
+
+    if (!problems.length && !noQuestionsConfirmed) {
+      sendJson(res, 400, { error: "질문할 문제를 선택하거나 '질문할 문제 없음'을 체크해 주세요." });
+      return;
+    }
+
+    if (!submittedFiles.some((file) => file && /^image\//.test(file.mimeType))) {
+      sendJson(res, 400, { error: "과제 사진을 한 장 이상 첨부해 주세요." });
       return;
     }
 
@@ -451,9 +467,10 @@ async function handleApi(req, res, pathname) {
 
     const existing = assignment.responses.find((response) => response.studentName === studentName);
     if (existing) {
-      if (hasProblemPayload && !body.keepProblems) {
+      if (hasProblemPayload) {
         existing.problems = problems;
       }
+      existing.noQuestionsConfirmed = noQuestionsConfirmed;
       existing.files = [...(existing.files || []), ...uploadedFiles];
       existing.updatedAt = new Date().toISOString();
     } else {
@@ -461,6 +478,7 @@ async function handleApi(req, res, pathname) {
         id: crypto.randomBytes(4).toString("hex"),
         studentName,
         problems,
+        noQuestionsConfirmed,
         files: uploadedFiles,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

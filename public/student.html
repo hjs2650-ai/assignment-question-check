@@ -34,8 +34,8 @@
           </label>
           <section id="studentMissingCheck" class="student-missing-check">
             <div>
-              <strong>내 미제출 과제</strong>
-              <span class="muted">이름을 입력하면 제출하지 않은 지난 과제를 확인할 수 있어요.</span>
+              <strong>내 과제 확인</strong>
+              <span class="muted">미제출 과제와 내가 체크한 질문 번호를 확인할 수 있어요.</span>
             </div>
             <button id="checkMissingBtn" class="ghost" type="button">확인하기</button>
           </section>
@@ -51,6 +51,13 @@
               <span id="checkedCount" class="badge">0개 선택</span>
             </div>
             <div id="problemGrid" class="check-grid"></div>
+            <label class="no-question-option">
+              <input id="noQuestion" type="checkbox" />
+              <span>
+                <strong>질문할 문제 없음</strong>
+                <small>질문할 문제가 없다면 꼭 체크해 주세요.</small>
+              </span>
+            </label>
             <div class="photo-upload">
               <strong>과제 사진 첨부</strong>
               <div class="photo-actions">
@@ -84,6 +91,13 @@
                 <span id="pastCheckedCount" class="badge">0개 선택</span>
               </div>
               <div id="pastProblemGrid" class="check-grid past-check-grid"></div>
+              <label class="no-question-option">
+                <input id="pastNoQuestion" type="checkbox" />
+                <span>
+                  <strong>질문할 문제 없음</strong>
+                  <small>질문할 문제가 없다면 꼭 체크해 주세요.</small>
+                </span>
+              </label>
             </section>
             <div class="photo-upload">
               <strong>지난과제 사진 첨부</strong>

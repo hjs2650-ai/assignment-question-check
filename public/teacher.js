@@ -191,11 +191,16 @@ function groupedByClass(assignments) {
     .sort((a, b) => compareByClassOrder(a.className, b.className));
 }
 
+function responseQuestionText(assignment, response) {
+  if (response.problems.length) {
+    return response.problems.map((problem) => problemLabel(assignment, problem)).join(", ");
+  }
+  return response.noQuestionsConfirmed ? "질문 없음 확인" : "질문 선택 확인 기록 없음";
+}
+
 function responseSummary(assignment) {
   const rows = (assignment.responses || []).map((response) => {
-    const problems = response.problems.length
-      ? response.problems.map((problem) => problemLabel(assignment, problem)).join(", ")
-      : "질문 없음";
+    const problems = responseQuestionText(assignment, response);
     const files = (response.files || []).length ? " · 사진 첨부" : "";
     return `${response.studentName}: ${problems}${files}`;
   });
@@ -467,9 +472,7 @@ function responsesHtml(assignment) {
     ? `<p class="muted">아직 제출한 학생이 없습니다.</p>`
     : assignment.responses
         .map((response) => {
-          const problems = response.problems.length
-            ? response.problems.map((problem) => problemLabel(assignment, problem)).join(", ")
-            : "질문 없음";
+          const problems = responseQuestionText(assignment, response);
           const files = (response.files || []).length ? ` · 사진 첨부함` : "";
           return `<div class="response-row"><strong>${escapeHtml(response.studentName)}</strong><span>${escapeHtml(problems)}${files}</span><em>${escapeHtml(formatDateTime(response.updatedAt))}</em></div>`;
         })
