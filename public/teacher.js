@@ -14,6 +14,10 @@ const selectedClassTitle = document.querySelector("#selectedClassTitle");
 const selectedClassContext = document.querySelector("#selectedClassContext");
 const selectedClassSummary = document.querySelector("#selectedClassSummary");
 const todayClassLabel = document.querySelector("#todayClassLabel");
+const studentPasswordSettings = document.querySelector("#studentPasswordSettings");
+const passwordClassLabel = document.querySelector("#passwordClassLabel");
+const studentPasswordList = document.querySelector("#studentPasswordList");
+const studentPasswordMessage = document.querySelector("#studentPasswordMessage");
 const defaultClasses = [];
 const fixedClassOrder = ["고1 1티어D3", "고1 제니트Z2", "고1 SKYA3"];
 let latestAssignments = [];
@@ -47,6 +51,114 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+async function saveStudentPassword(studentName, password, enabled) {
+  return api(`/api/classes/${encodeURIComponent(selectedClassName)}/passwords`, {
+    method: "POST",
+    body: JSON.stringify({ studentName, password, enabled }),
+  });
+}
+
+function bindStudentPasswordActions() {
+  studentPasswordList.querySelectorAll(".set-student-password").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const row = button.closest(".student-password-row");
+      const input = row.querySelector('input[type="password"]');
+      const password = input.value.trim();
+      studentPasswordMessage.className = "message";
+      studentPasswordMessage.textContent = "";
+      if (!/^\d{4}$/.test(password)) {
+        studentPasswordMessage.className = "message error";
+        studentPasswordMessage.textContent = "비밀번호는 숫자 4자리로 입력해 주세요.";
+        input.focus();
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        await saveStudentPassword(button.dataset.student, password, true);
+        studentPasswordMessage.className = "message success";
+        studentPasswordMessage.textContent = `${button.dataset.student} 학생 비밀번호를 설정했습니다.`;
+        await loadStudentPasswordSettings();
+      } catch (error) {
+        studentPasswordMessage.className = "message error";
+        studentPasswordMessage.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+
+  studentPasswordList.querySelectorAll(".remove-student-password").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await saveStudentPassword(button.dataset.student, "", false);
+        studentPasswordMessage.className = "message success";
+        studentPasswordMessage.textContent = `${button.dataset.student} 학생 비밀번호를 해제했습니다.`;
+        await loadStudentPasswordSettings();
+      } catch (error) {
+        studentPasswordMessage.className = "message error";
+        studentPasswordMessage.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+}
+
+async function loadStudentPasswordSettings() {
+  if (!selectedClassName) {
+    return;
+  }
+  const requestedClass = selectedClassName;
+  passwordClassLabel.textContent = shortClassName(requestedClass);
+  studentPasswordList.innerHTML = `<p class="muted">학생 명단을 불러오는 중입니다.</p>`;
+
+  try {
+    const payload = await api(`/api/classes/${encodeURIComponent(requestedClass)}/passwords`);
+    if (requestedClass !== selectedClassName) {
+      return;
+    }
+    studentPasswordList.innerHTML = payload.students.length
+      ? payload.students
+          .map(
+            (student) => `
+              <div class="student-password-row">
+                <div class="student-password-name">
+                  <strong>${escapeHtml(student.name)}</strong>
+                  <span class="badge ${student.passwordEnabled ? "is-enabled" : ""}">
+                    ${student.passwordEnabled ? "설정됨" : "미설정"}
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  inputmode="numeric"
+                  pattern="[0-9]{4}"
+                  maxlength="4"
+                  autocomplete="new-password"
+                  aria-label="${escapeHtml(student.name)} 새 비밀번호"
+                  placeholder="새 4자리"
+                />
+                <button class="set-student-password" type="button" data-student="${escapeHtml(student.name)}">
+                  ${student.passwordEnabled ? "재설정" : "설정"}
+                </button>
+                <button
+                  class="remove-student-password ghost"
+                  type="button"
+                  data-student="${escapeHtml(student.name)}"
+                  ${student.passwordEnabled ? "" : "disabled"}
+                >해제</button>
+              </div>
+            `,
+          )
+          .join("")
+      : `<p class="muted">이 반에 등록된 학생이 없습니다.</p>`;
+    bindStudentPasswordActions();
+  } catch (error) {
+    studentPasswordList.innerHTML = `<p class="message error">${escapeHtml(error.message)}</p>`;
+  }
 }
 
 function rangeLabel(assignment) {
@@ -639,6 +751,9 @@ function renderTeacherClassTabs(classes) {
       assignmentViewMode = "current";
       selectedPastAssignmentId = "";
       renderFocusedDashboard();
+      if (studentPasswordSettings.open) {
+        loadStudentPasswordSettings();
+      }
     });
   });
 }
@@ -669,6 +784,7 @@ function renderFocusedDashboard() {
   renderTeacherClassTabs(groups.map((item) => item.className));
   selectedClassTitle.textContent = selectedClassName || "과제 없음";
   selectedClassContext.textContent = contextLabel;
+  passwordClassLabel.textContent = shortClassName(selectedClassName);
   currentAssignmentTab.classList.toggle("is-active", assignmentViewMode === "current");
   pastAssignmentsTab.classList.toggle("is-active", assignmentViewMode === "past");
   cumulativeMissingTab.classList.toggle("is-active", assignmentViewMode === "missing");
@@ -748,6 +864,9 @@ function renderAssignments(assignments) {
   }
   todayClassLabel.textContent = `${todayLabel()} · ${new Date().getDay() === 0 ? "다음 수업" : "오늘 수업"} ${shortClassName(scheduledClass)}`;
   renderFocusedDashboard();
+  if (studentPasswordSettings.open) {
+    loadStudentPasswordSettings();
+  }
 }
 
 async function loadAssignments() {
@@ -777,5 +896,11 @@ pastAssignmentsTab.addEventListener("click", () => {
 cumulativeMissingTab.addEventListener("click", () => {
   assignmentViewMode = "missing";
   renderFocusedDashboard();
+});
+studentPasswordSettings.addEventListener("toggle", () => {
+  if (studentPasswordSettings.open) {
+    studentPasswordMessage.textContent = "";
+    loadStudentPasswordSettings();
+  }
 });
 loadAssignments();

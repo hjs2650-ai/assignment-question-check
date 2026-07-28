@@ -9,6 +9,8 @@ const grid = document.querySelector("#problemGrid");
 const form = document.querySelector("#responseForm");
 const submitButton = form.querySelector('button[type="submit"]');
 const nameInput = document.querySelector("#studentName");
+const passwordWrap = document.querySelector("#studentPasswordWrap");
+const passwordInput = document.querySelector("#studentPassword");
 const checkedCount = document.querySelector("#checkedCount");
 const noQuestionInput = document.querySelector("#noQuestion");
 const message = document.querySelector("#message");
@@ -39,6 +41,7 @@ let availableAssignments = [];
 let currentPhotoFiles = [];
 let pastPhotoFiles = [];
 let activeSubmissionMode = "current";
+let passwordRequiredStudents = new Set();
 const MAX_PHOTOS = 20;
 
 async function api(path, options = {}) {
@@ -75,6 +78,24 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function updatePasswordVisibility() {
+  const passwordRequired = passwordRequiredStudents.has(nameInput.value.trim());
+  passwordWrap.hidden = !passwordRequired;
+  passwordInput.required = passwordRequired;
+  if (!passwordRequired) {
+    passwordInput.value = "";
+  }
+}
+
+function revealPasswordForError(error) {
+  if (!String(error && error.message).includes("비밀번호")) {
+    return;
+  }
+  passwordWrap.hidden = false;
+  passwordInput.required = true;
+  passwordInput.focus();
 }
 
 function itemLabel(item) {
@@ -234,11 +255,16 @@ async function loadStudentMissingStatus() {
   checkMissingBtn.disabled = true;
   checkMissingBtn.textContent = "확인 중";
   try {
-    const payload = await api(
-      `/api/classes/${encodeURIComponent(routeValue)}/status?studentName=${encodeURIComponent(studentName)}`,
-    );
+    const payload = await api(`/api/classes/${encodeURIComponent(routeValue)}/status`, {
+      method: "POST",
+      body: JSON.stringify({
+        studentName,
+        studentPassword: passwordInput.value,
+      }),
+    });
     renderStudentMissingAssignments(payload.assignments || []);
   } catch (error) {
+    revealPasswordForError(error);
     studentMissingResult.hidden = false;
     studentMissingResult.innerHTML = `<p class="message error">${escapeHtml(error.message)}</p>`;
   } finally {
@@ -369,6 +395,8 @@ async function loadAssignment() {
     if (!payload.assignments.length) {
       throw new Error("이 반에 등록된 과제가 아직 없습니다.");
     }
+    passwordRequiredStudents = new Set(payload.passwordRequiredStudents || []);
+    updatePasswordVisibility();
     renderPastAssignmentSelector(payload.assignments);
     showAssignment(payload.assignments[0]);
     return;
@@ -377,6 +405,8 @@ async function loadAssignment() {
   pastAssignmentWrap.hidden = true;
   submissionTabs.hidden = true;
   const assignment = await api(`/api/assignments/${assignmentId}`);
+  passwordRequiredStudents = new Set(assignment.passwordRequiredStudents || []);
+  updatePasswordVisibility();
   showAssignment(assignment);
 }
 
@@ -416,6 +446,7 @@ form.addEventListener("submit", async (event) => {
       method: "POST",
       body: JSON.stringify({
         studentName: nameInput.value,
+        studentPassword: passwordInput.value,
         problems,
         noQuestionsConfirmed,
         files,
@@ -428,6 +459,7 @@ form.addEventListener("submit", async (event) => {
     message.className = "message success";
     message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.</span>";
   } catch (error) {
+    revealPasswordForError(error);
     message.className = "message error";
     message.textContent = error.message;
   } finally {
@@ -488,6 +520,7 @@ async function submitPastAssignment() {
       method: "POST",
       body: JSON.stringify({
         studentName,
+        studentPassword: passwordInput.value,
         files,
         problems,
         noQuestionsConfirmed,
@@ -543,6 +576,7 @@ pastAssignmentSelect.addEventListener("change", () => {
 });
 pastSubmitBtn.addEventListener("click", () => {
   submitPastAssignment().catch((error) => {
+    revealPasswordForError(error);
     pastSubmitBtn.disabled = !pastAssignmentSelect.value;
     pastMessage.className = "message error";
     pastMessage.textContent = error.message;
@@ -550,6 +584,7 @@ pastSubmitBtn.addEventListener("click", () => {
 });
 checkMissingBtn.addEventListener("click", loadStudentMissingStatus);
 nameInput.addEventListener("input", () => {
+  updatePasswordVisibility();
   studentMissingResult.hidden = true;
   studentMissingResult.innerHTML = "";
 });

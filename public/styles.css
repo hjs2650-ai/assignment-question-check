@@ -165,6 +165,15 @@ label {
   font-weight: 700;
 }
 
+.student-password-field[hidden] {
+  display: none;
+}
+
+.student-password-field small {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 input,
 select,
 textarea {
@@ -453,6 +462,45 @@ button:disabled {
 .class-list {
   display: grid;
   gap: 10px;
+}
+
+.password-settings-help {
+  margin: 12px 0;
+}
+
+.student-password-list {
+  display: grid;
+  gap: 8px;
+}
+
+.student-password-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 130px auto auto;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.student-password-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.student-password-name .badge {
+  background: #f1f4f8;
+  color: var(--muted);
+}
+
+.student-password-name .badge.is-enabled {
+  background: #e9f8f4;
+  color: var(--accent);
+}
+
+.student-password-row input {
+  min-width: 0;
 }
 
 .compact-section {
@@ -1033,6 +1081,14 @@ summary {
   .student-missing-check button,
   .open-missing-assignment {
     width: 100%;
+  }
+
+  .student-password-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .student-password-name {
+    grid-column: 1 / -1;
   }
 }
 

@@ -32,6 +32,19 @@
             이름
             <input id="studentName" placeholder="예: 홍길동" autocomplete="name" required />
           </label>
+          <label id="studentPasswordWrap" class="student-password-field" hidden>
+            비밀번호
+            <input
+              id="studentPassword"
+              type="password"
+              inputmode="numeric"
+              pattern="[0-9]{4}"
+              maxlength="4"
+              autocomplete="current-password"
+              placeholder="숫자 4자리"
+            />
+            <small>선생님이 비밀번호를 설정한 학생만 입력합니다.</small>
+          </label>
           <section id="studentMissingCheck" class="student-missing-check">
             <div>
               <strong>내 과제 확인</strong>

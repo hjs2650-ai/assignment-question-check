@@ -49,6 +49,21 @@ function normalizeClassName(value) {
   return normalizeText(value) || DEFAULT_CLASS;
 }
 
+function passwordRecord(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 32).toString("hex");
+  return { salt, hash };
+}
+
+function passwordMatches(password, record) {
+  if (!record || !record.salt || !record.hash) {
+    return true;
+  }
+  const expected = Buffer.from(record.hash, "hex");
+  const actual = crypto.scryptSync(password, record.salt, expected.length);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
 function makeProblemList(start, end) {
   const first = Number(start);
   const last = Number(end);
@@ -170,6 +185,8 @@ function normalizeData(data) {
     classInfo.name = normalizeClassName(classInfo.name);
     classInfo.students = Array.isArray(classInfo.students) ? classInfo.students.map(normalizeText).filter(Boolean) : [];
     classInfo.studentStartDates = classInfo.studentStartDates && typeof classInfo.studentStartDates === "object" ? classInfo.studentStartDates : {};
+    classInfo.studentPasswords =
+      classInfo.studentPasswords && typeof classInfo.studentPasswords === "object" ? classInfo.studentPasswords : {};
   });
   data.assignments.forEach((assignment) => {
     assignment.className = normalizeClassName(assignment.className);
@@ -211,6 +228,32 @@ function studentsForClass(data, className) {
   const targetClass = normalizeClassName(className);
   const classInfo = data.classes.find((item) => normalizeClassName(item.name) === targetClass);
   return classInfo ? classInfo.students : [];
+}
+
+function classInfoFor(data, className) {
+  const targetClass = normalizeClassName(className);
+  return data.classes.find((item) => normalizeClassName(item.name) === targetClass);
+}
+
+function studentPasswordRecord(data, className, studentName) {
+  const classInfo = classInfoFor(data, className);
+  return classInfo && classInfo.studentPasswords ? classInfo.studentPasswords[studentName] : null;
+}
+
+function validateStudentAccess(data, className, studentName, password, eligibleStudents = null) {
+  const classStudents = Array.isArray(eligibleStudents) ? eligibleStudents : studentsForClass(data, className);
+  if (!studentName || (classStudents.length > 0 && !classStudents.includes(studentName))) {
+    return { status: 404, error: "반 명단에서 이름을 확인할 수 없습니다. 이름을 정확히 입력해 주세요." };
+  }
+
+  const record = studentPasswordRecord(data, className, studentName);
+  if (record && !normalizeText(password)) {
+    return { status: 401, error: "이 학생은 비밀번호가 설정되어 있습니다. 4자리 비밀번호를 입력해 주세요." };
+  }
+  if (record && !passwordMatches(normalizeText(password), record)) {
+    return { status: 401, error: "비밀번호가 맞지 않습니다. 다시 확인해 주세요." };
+  }
+  return null;
 }
 
 function dateKey(value) {
@@ -299,6 +342,53 @@ async function handleApi(req, res, pathname) {
     return;
   }
 
+  const classPasswordsMatch = pathname.match(/^\/api\/classes\/([^/]+)\/passwords$/);
+  if (classPasswordsMatch) {
+    const className = decodeURIComponent(classPasswordsMatch[1]);
+    const classInfo = classInfoFor(data, className);
+    if (!classInfo) {
+      sendJson(res, 404, { error: "반 명단을 찾을 수 없습니다." });
+      return;
+    }
+
+    if (req.method === "GET") {
+      sendJson(res, 200, {
+        className: classInfo.name,
+        students: classInfo.students.map((name) => ({
+          name,
+          passwordEnabled: Boolean(classInfo.studentPasswords[name]),
+        })),
+      });
+      return;
+    }
+
+    if (req.method === "POST") {
+      const body = await readBody(req);
+      const studentName = normalizeText(body.studentName);
+      const password = normalizeText(body.password);
+      if (!classInfo.students.includes(studentName)) {
+        sendJson(res, 404, { error: "반 명단에서 학생 이름을 찾을 수 없습니다." });
+        return;
+      }
+      if (body.enabled !== false && !/^\d{4}$/.test(password)) {
+        sendJson(res, 400, { error: "비밀번호는 숫자 4자리로 입력해 주세요." });
+        return;
+      }
+
+      if (body.enabled === false) {
+        delete classInfo.studentPasswords[studentName];
+      } else {
+        classInfo.studentPasswords[studentName] = passwordRecord(password);
+      }
+      await store.write(data);
+      sendJson(res, 200, {
+        studentName,
+        passwordEnabled: Boolean(classInfo.studentPasswords[studentName]),
+      });
+      return;
+    }
+  }
+
   const classCurrentMatch = pathname.match(/^\/api\/classes\/([^/]+)\/current$/);
   if (req.method === "GET" && classCurrentMatch) {
     const className = decodeURIComponent(classCurrentMatch[1]);
@@ -310,6 +400,9 @@ async function handleApi(req, res, pathname) {
     sendJson(res, 200, {
       ...publicAssignment(assignment),
       students: studentsForAssignment(data, assignment),
+      passwordRequiredStudents: studentsForAssignment(data, assignment).filter((student) =>
+        Boolean(studentPasswordRecord(data, assignment.className, student)),
+      ),
     });
     return;
   }
@@ -326,18 +419,24 @@ async function handleApi(req, res, pathname) {
     sendJson(res, 200, {
       assignments,
       students: studentsForClass(data, className),
+      passwordRequiredStudents: studentsForClass(data, className).filter((student) =>
+        Boolean(studentPasswordRecord(data, className, student)),
+      ),
     });
     return;
   }
 
   const classStatusMatch = pathname.match(/^\/api\/classes\/([^/]+)\/status$/);
-  if (req.method === "GET" && classStatusMatch) {
+  if ((req.method === "GET" || req.method === "POST") && classStatusMatch) {
     const className = decodeURIComponent(classStatusMatch[1]);
-    const studentName = normalizeText(new URL(req.url, "http://localhost").searchParams.get("studentName"));
+    const body = req.method === "POST" ? await readBody(req) : {};
+    const url = new URL(req.url, "http://localhost");
+    const studentName = normalizeText(body.studentName || url.searchParams.get("studentName"));
+    const studentPassword = normalizeText(body.studentPassword || url.searchParams.get("studentPassword"));
     const classStudents = studentsForClass(data, className);
-
-    if (!studentName || !classStudents.includes(studentName)) {
-      sendJson(res, 404, { error: "반 명단에서 이름을 확인할 수 없습니다. 이름을 정확히 입력해 주세요." });
+    const accessError = validateStudentAccess(data, className, studentName, studentPassword, classStudents);
+    if (accessError) {
+      sendJson(res, accessError.status, { error: accessError.error });
       return;
     }
 
@@ -420,6 +519,9 @@ async function handleApi(req, res, pathname) {
     sendJson(res, 200, {
       ...publicAssignment(assignment),
       students: studentsForAssignment(data, assignment),
+      passwordRequiredStudents: studentsForAssignment(data, assignment).filter((student) =>
+        Boolean(studentPasswordRecord(data, assignment.className, student)),
+      ),
     });
     return;
   }
@@ -434,6 +536,7 @@ async function handleApi(req, res, pathname) {
 
     const body = await readBody(req);
     const studentName = normalizeText(body.studentName);
+    const studentPassword = normalizeText(body.studentPassword);
     const hasProblemPayload = Array.isArray(body.problems);
     const checked = hasProblemPayload ? body.problems.map(String) : [];
     const noQuestionsConfirmed = body.noQuestionsConfirmed === true;
@@ -443,6 +546,18 @@ async function handleApi(req, res, pathname) {
 
     if (!studentName) {
       sendJson(res, 400, { error: "이름을 입력해 주세요." });
+      return;
+    }
+
+    const accessError = validateStudentAccess(
+      data,
+      assignment.className,
+      studentName,
+      studentPassword,
+      studentsForAssignment(data, assignment),
+    );
+    if (accessError) {
+      sendJson(res, accessError.status, { error: accessError.error });
       return;
     }
 
