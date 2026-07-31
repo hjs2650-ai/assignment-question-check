@@ -323,6 +323,10 @@ function latestAssignmentForClass(data, className) {
 
 async function handleApi(req, res, pathname) {
   if (req.method === "GET" && pathname === "/api/health") {
+    const requestUrl = new URL(req.url, "http://localhost");
+    if (requestUrl.searchParams.has("wake")) {
+      await store.read();
+    }
     sendJson(res, 200, {
       ok: true,
       storage: store.kind,

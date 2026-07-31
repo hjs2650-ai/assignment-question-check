@@ -65,6 +65,11 @@ function createLocalStore(localFile) {
 }
 
 function createSheetsStore(sheetsUrl, sheetsSecret, fallbackStore) {
+  const CACHE_TTL_MS = 15_000;
+  let cachedData = null;
+  let cachedAt = 0;
+  let readInFlight = null;
+
   async function request(action, data) {
     const response = await fetch(sheetsUrl, {
       method: "POST",
@@ -78,11 +83,30 @@ function createSheetsStore(sheetsUrl, sheetsSecret, fallbackStore) {
     return payload;
   }
 
+  async function readSheets() {
+    if (cachedData && Date.now() - cachedAt < CACHE_TTL_MS) {
+      return cachedData;
+    }
+    if (readInFlight) {
+      return readInFlight;
+    }
+
+    readInFlight = request("read")
+      .then((payload) => {
+        cachedData = payload.data || emptyData();
+        cachedAt = Date.now();
+        return cachedData;
+      })
+      .finally(() => {
+        readInFlight = null;
+      });
+    return readInFlight;
+  }
+
   return {
     kind: "google-sheets",
     async read() {
-      const payload = await request("read");
-      return payload.data || emptyData();
+      return readSheets();
     },
     async write(data) {
       const compact = compactData(data);
@@ -96,6 +120,8 @@ function createSheetsStore(sheetsUrl, sheetsSecret, fallbackStore) {
           throw writeError;
         }
       }
+      cachedData = compact;
+      cachedAt = Date.now();
       await fallbackStore.write(compact);
     },
     async uploadFiles(assignment, studentName, files) {
