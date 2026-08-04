@@ -496,9 +496,9 @@ async function submitPastAssignment() {
     return;
   }
 
-  if (!files.length) {
+  if (!files.length && !problems.length) {
     pastMessage.className = "message error";
-    pastMessage.textContent = "지난과제 사진을 첨부해 주세요.";
+    pastMessage.textContent = "질문할 문제를 선택하거나 지난과제 사진을 첨부해 주세요.";
     return;
   }
 
