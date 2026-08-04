@@ -547,6 +547,9 @@ async function handleApi(req, res, pathname) {
     const submittedFiles = Array.isArray(body.files) ? body.files : [];
     const validSet = new Set(assignment.problems);
     const problems = [...new Set(checked)].filter((problem) => validSet.has(problem));
+    const latestAssignment = latestAssignmentForClass(data, assignment.className);
+    const isPastAssignment = Boolean(latestAssignment && latestAssignment.id !== assignment.id);
+    const hasSubmittedPhoto = submittedFiles.some((file) => file && /^image\//.test(file.mimeType));
 
     if (!studentName) {
       sendJson(res, 400, { error: "이름을 입력해 주세요." });
@@ -570,7 +573,7 @@ async function handleApi(req, res, pathname) {
       return;
     }
 
-    if (!submittedFiles.some((file) => file && /^image\//.test(file.mimeType))) {
+    if (!hasSubmittedPhoto && !(isPastAssignment && problems.length > 0)) {
       sendJson(res, 400, { error: "과제 사진을 한 장 이상 첨부해 주세요." });
       return;
     }
