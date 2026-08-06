@@ -12,15 +12,19 @@ function compactData(data) {
   return {
     ...data,
     assignments: data.assignments.map((assignment) => {
-      const { problems, responses, ...savedAssignment } = assignment;
+      const { problems, responses, detail, theme, ...savedAssignment } = assignment;
       return {
         ...savedAssignment,
+        ...(theme && theme !== "focus" ? { theme } : {}),
         books: Array.isArray(savedAssignment.books)
           ? savedAssignment.books.map(({ problems: bookProblems, ...book }) => book)
           : savedAssignment.books,
         responses: (responses || []).map((response) => {
-          const { files, ...savedResponse } = response;
-          return savedResponse;
+          const { files, createdAt, noQuestionsConfirmed, ...savedResponse } = response;
+          return {
+            ...savedResponse,
+            ...(noQuestionsConfirmed === true ? { noQuestionsConfirmed: true } : {}),
+          };
         }),
       };
     }),
