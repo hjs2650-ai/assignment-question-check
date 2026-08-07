@@ -413,12 +413,14 @@ async function loadAssignment() {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   message.className = "message";
+  const studentName = nameInput.value.trim();
   const problems = [...grid.querySelectorAll("input:checked")].map((input) => input.value);
   const noQuestionsConfirmed = noQuestionInput.checked;
 
-  if (!problems.length && !noQuestionsConfirmed) {
+  if (!studentName) {
     message.className = "message error";
-    message.textContent = "질문할 문제를 선택해 주세요. 질문이 없다면 '질문할 문제 없음'을 체크해 주세요.";
+    message.textContent = "이름을 먼저 입력해 주세요.";
+    nameInput.focus();
     return;
   }
 
@@ -438,6 +440,16 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
+  if (
+    !problems.length &&
+    !noQuestionsConfirmed &&
+    !window.confirm("질문할 문제를 아직 체크하지 않았습니다.\n이대로 과제를 제출하시겠습니까?")
+  ) {
+    message.className = "message error";
+    message.textContent = "질문할 문제를 체크하거나, 질문이 없다면 '질문할 문제 없음'을 체크해 주세요.";
+    return;
+  }
+
   message.textContent = "제출 중입니다.";
   submitButton.disabled = true;
 
@@ -445,7 +457,7 @@ form.addEventListener("submit", async (event) => {
     await api(`/api/assignments/${assignmentId}/responses`, {
       method: "POST",
       body: JSON.stringify({
-        studentName: nameInput.value,
+        studentName,
         studentPassword: passwordInput.value,
         problems,
         noQuestionsConfirmed,
@@ -490,15 +502,19 @@ async function submitPastAssignment() {
     return;
   }
 
-  if (!problems.length && !noQuestionsConfirmed) {
-    pastMessage.className = "message error";
-    pastMessage.textContent = "질문할 문제를 선택해 주세요. 질문이 없다면 '질문할 문제 없음'을 체크해 주세요.";
-    return;
-  }
-
   if (!files.length && !problems.length) {
     pastMessage.className = "message error";
     pastMessage.textContent = "질문할 문제를 선택하거나 지난과제 사진을 첨부해 주세요.";
+    return;
+  }
+
+  if (
+    !problems.length &&
+    !noQuestionsConfirmed &&
+    !window.confirm("질문할 문제를 아직 체크하지 않았습니다.\n이대로 지난과제를 제출하시겠습니까?")
+  ) {
+    pastMessage.className = "message error";
+    pastMessage.textContent = "질문할 문제를 체크하거나, 질문이 없다면 '질문할 문제 없음'을 체크해 주세요.";
     return;
   }
 
