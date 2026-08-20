@@ -7,8 +7,12 @@ const { createStore } = require("./storage");
 const PORT = Number(process.env.PORT || 3010);
 const ROOT = __dirname;
 const DEFAULT_CLASS = "공통";
-const YOUTUBE_PLAYLIST_ID = process.env.YOUTUBE_PLAYLIST_ID || "PLAljtV9lQmNQ";
+const YOUTUBE_CHANNEL_HANDLE = process.env.YOUTUBE_CHANNEL_HANDLE || "@종선이-m1y";
+const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || "";
+const YOUTUBE_OAUTH_CLIENT_ID = process.env.YOUTUBE_OAUTH_CLIENT_ID || "";
+const YOUTUBE_OAUTH_CLIENT_SECRET = process.env.YOUTUBE_OAUTH_CLIENT_SECRET || "";
+const YOUTUBE_OAUTH_REFRESH_TOKEN = process.env.YOUTUBE_OAUTH_REFRESH_TOKEN || "";
 const YOUTUBE_CACHE_MS = 15 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.SHEETS_SECRET || crypto.randomBytes(32).toString("hex");
 const SESSION_COOKIE = "hwangt_student_session";
@@ -20,6 +24,8 @@ const CLASS_WEEKDAYS = {
 };
 const ATTENDANCE_STATUSES = new Set(["present", "late", "absent", "early", "makeup"]);
 let youtubeCache = { expiresAt: 0, videos: [] };
+let youtubeUploadsPlaylistId = "";
+let youtubeAccessTokenCache = { expiresAt: 0, token: "" };
 const MANUAL_YOUTUBE_VIDEOS = [
   {
     id: "-uHifP-KULc",
@@ -184,56 +190,138 @@ function uniqueVideos(videos) {
   return [...byId.values()].sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
 }
 
-async function youtubePlaylistVideos() {
-  if (!YOUTUBE_API_KEY) {
-    const videos = uniqueVideos(MANUAL_YOUTUBE_VIDEOS);
-    return { configured: videos.length > 0, videos };
-  }
-  if (youtubeCache.expiresAt > Date.now()) {
-    return { configured: true, videos: youtubeCache.videos };
+function youtubeOAuthConfigured() {
+  return Boolean(YOUTUBE_OAUTH_CLIENT_ID && YOUTUBE_OAUTH_CLIENT_SECRET && YOUTUBE_OAUTH_REFRESH_TOKEN);
+}
+
+async function youtubeAccessToken() {
+  if (youtubeAccessTokenCache.token && youtubeAccessTokenCache.expiresAt > Date.now()) {
+    return youtubeAccessTokenCache.token;
   }
 
-  const videos = [];
-  let pageToken = "";
-  do {
-    const url = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
-    url.searchParams.set("part", "snippet,contentDetails");
-    url.searchParams.set("playlistId", YOUTUBE_PLAYLIST_ID);
-    url.searchParams.set("maxResults", "50");
-    url.searchParams.set("key", YOUTUBE_API_KEY);
-    if (pageToken) {
-      url.searchParams.set("pageToken", pageToken);
-    }
+  const body = new URLSearchParams({
+    client_id: YOUTUBE_OAUTH_CLIENT_ID,
+    client_secret: YOUTUBE_OAUTH_CLIENT_SECRET,
+    refresh_token: YOUTUBE_OAUTH_REFRESH_TOKEN,
+    grant_type: "refresh_token",
+  });
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.access_token) {
+    throw new Error(payload.error_description || payload.error || "유튜브 로그인 토큰을 갱신하지 못했습니다.");
+  }
 
-    const response = await fetch(url);
+  const expiresIn = Math.max(60, Number(payload.expires_in || 3600) - 60);
+  youtubeAccessTokenCache = {
+    token: payload.access_token,
+    expiresAt: Date.now() + expiresIn * 1000,
+  };
+  return youtubeAccessTokenCache.token;
+}
+
+async function youtubeApiJson(url, accessToken = "") {
+  if (accessToken) {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error?.message || "유튜브 재생목록을 불러오지 못했습니다.");
-    }
-
-    for (const item of payload.items || []) {
-      const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
-      const title = normalizeText(item.snippet?.title);
-      if (!videoId || !title || title === "Private video" || title === "Deleted video") {
-        continue;
+      if (response.status === 401) {
+        youtubeAccessTokenCache = { expiresAt: 0, token: "" };
       }
-      videos.push({
-        id: videoId,
-        title,
-        publishedAt: item.contentDetails?.videoPublishedAt || item.snippet?.publishedAt || "",
-        thumbnail:
-          item.snippet?.thumbnails?.medium?.url ||
-          item.snippet?.thumbnails?.high?.url ||
-          `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-      });
+      throw new Error(payload.error?.message || "유튜브 정보를 불러오지 못했습니다.");
     }
-    pageToken = payload.nextPageToken || "";
-  } while (pageToken && videos.length < 200);
+    return payload;
+  }
 
-  const mergedVideos = uniqueVideos([...MANUAL_YOUTUBE_VIDEOS, ...videos]);
-  youtubeCache = { expiresAt: Date.now() + YOUTUBE_CACHE_MS, videos: mergedVideos };
-  return { configured: true, videos: mergedVideos };
+  url.searchParams.set("key", YOUTUBE_API_KEY);
+  const response = await fetch(url);
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error?.message || "유튜브 정보를 불러오지 못했습니다.");
+  }
+  return payload;
+}
+
+async function resolveYoutubeUploadsPlaylistId(accessToken = "") {
+  if (youtubeUploadsPlaylistId) {
+    return youtubeUploadsPlaylistId;
+  }
+
+  const url = new URL("https://www.googleapis.com/youtube/v3/channels");
+  url.searchParams.set("part", "contentDetails");
+  if (accessToken) {
+    url.searchParams.set("mine", "true");
+  } else if (YOUTUBE_CHANNEL_ID) {
+    url.searchParams.set("id", YOUTUBE_CHANNEL_ID);
+  } else {
+    url.searchParams.set("forHandle", YOUTUBE_CHANNEL_HANDLE);
+  }
+  const payload = await youtubeApiJson(url, accessToken);
+
+  youtubeUploadsPlaylistId = payload.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || "";
+  if (!youtubeUploadsPlaylistId) {
+    throw new Error("유튜브 채널의 업로드 목록을 찾지 못했습니다.");
+  }
+  return youtubeUploadsPlaylistId;
+}
+
+async function youtubeChannelVideos() {
+  const useOAuth = youtubeOAuthConfigured();
+  if (!useOAuth && !YOUTUBE_API_KEY) {
+    const videos = uniqueVideos(MANUAL_YOUTUBE_VIDEOS);
+    return { configured: videos.length > 0, autoSync: false, syncMode: "manual", videos };
+  }
+  if (youtubeCache.expiresAt > Date.now()) {
+    return { configured: true, autoSync: true, syncMode: useOAuth ? "oauth" : "public", videos: youtubeCache.videos };
+  }
+
+  try {
+    const accessToken = useOAuth ? await youtubeAccessToken() : "";
+    const uploadsPlaylistId = await resolveYoutubeUploadsPlaylistId(accessToken);
+    const videos = [];
+    let pageToken = "";
+    do {
+      const url = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
+      url.searchParams.set("part", "snippet,contentDetails");
+      url.searchParams.set("playlistId", uploadsPlaylistId);
+      url.searchParams.set("maxResults", "50");
+      if (pageToken) {
+        url.searchParams.set("pageToken", pageToken);
+      }
+
+      const payload = await youtubeApiJson(url, accessToken);
+
+      for (const item of payload.items || []) {
+        const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
+        const title = normalizeText(item.snippet?.title);
+        if (!videoId || !title || title === "Private video" || title === "Deleted video") {
+          continue;
+        }
+        videos.push({
+          id: videoId,
+          title,
+          publishedAt: item.contentDetails?.videoPublishedAt || item.snippet?.publishedAt || "",
+          thumbnail:
+            item.snippet?.thumbnails?.medium?.url ||
+            item.snippet?.thumbnails?.high?.url ||
+            `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+        });
+      }
+      pageToken = payload.nextPageToken || "";
+    } while (pageToken && videos.length < 200);
+
+    const mergedVideos = uniqueVideos([...MANUAL_YOUTUBE_VIDEOS, ...videos]);
+    youtubeCache = { expiresAt: Date.now() + YOUTUBE_CACHE_MS, videos: mergedVideos };
+    return { configured: true, autoSync: true, syncMode: useOAuth ? "oauth" : "public", videos: mergedVideos };
+  } catch (error) {
+    console.error("YouTube auto sync failed:", error.message);
+    const videos = uniqueVideos(MANUAL_YOUTUBE_VIDEOS);
+    return { configured: videos.length > 0, autoSync: false, syncMode: "manual", videos };
+  }
 }
 
 function passwordRecord(password) {
@@ -743,9 +831,11 @@ async function handleApi(req, res, pathname) {
   const classVideosMatch = pathname.match(/^\/api\/classes\/([^/]+)\/videos$/);
   if (req.method === "GET" && classVideosMatch) {
     const className = decodeURIComponent(classVideosMatch[1]);
-    const result = await youtubePlaylistVideos();
+    const result = await youtubeChannelVideos();
     sendJson(res, 200, {
       configured: result.configured,
+      autoSync: result.autoSync,
+      syncMode: result.syncMode,
       videos: result.videos.filter((video) => videoMatchesClass(video.title, className)).slice(0, 12),
     });
     return;

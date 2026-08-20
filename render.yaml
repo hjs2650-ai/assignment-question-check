@@ -13,5 +13,11 @@ services:
         sync: false
       - key: YOUTUBE_API_KEY
         sync: false
-      - key: YOUTUBE_PLAYLIST_ID
-        value: PLAljtV9lQmNQ
+      - key: YOUTUBE_OAUTH_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_OAUTH_REFRESH_TOKEN
+        sync: false
+      - key: YOUTUBE_CHANNEL_HANDLE
+        value: "@종선이-m1y"
