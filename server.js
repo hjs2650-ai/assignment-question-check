@@ -464,6 +464,9 @@ function normalizeData(data) {
   });
   data.assignments.forEach((assignment) => {
     assignment.className = normalizeClassName(assignment.className);
+    assignment.students = Array.isArray(assignment.students)
+      ? [...new Set(assignment.students.map(normalizeText).filter(Boolean))]
+      : [];
     assignment.books = booksForAssignment(assignment);
     assignment.problems = assignment.books.flatMap((range) => range.problems).map(String);
     assignment.book = assignment.books.map((range) => range.book).join(", ");
@@ -765,7 +768,11 @@ function studentsForAssignment(data, assignment) {
     return [];
   }
   const assignmentDate = dateKey(assignment.dateLabel);
+  const eligibleStudents = new Set(Array.isArray(assignment.students) ? assignment.students : []);
   return classInfo.students.filter((student) => {
+    if (eligibleStudents.size > 0 && !eligibleStudents.has(student)) {
+      return false;
+    }
     const startDate = dateKey(classInfo.studentStartDates && classInfo.studentStartDates[student]);
     return !startDate || !assignmentDate || startDate <= assignmentDate;
   });
@@ -807,10 +814,11 @@ function classNames(data) {
   ].sort((a, b) => a.localeCompare(b, "ko"));
 }
 
-function latestAssignmentForClass(data, className) {
+function latestAssignmentForClass(data, className, studentName = "") {
   const targetClass = normalizeClassName(className);
   return data.assignments
     .filter((assignment) => normalizeClassName(assignment.className) === targetClass)
+    .filter((assignment) => !studentName || studentsForAssignment(data, assignment).includes(studentName))
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 }
@@ -1118,7 +1126,9 @@ async function handleApi(req, res, pathname) {
   const classCurrentMatch = pathname.match(/^\/api\/classes\/([^/]+)\/current$/);
   if (req.method === "GET" && classCurrentMatch) {
     const className = decodeURIComponent(classCurrentMatch[1]);
-    const assignment = latestAssignmentForClass(data, className);
+    const session = studentSession(req, data);
+    const studentName = session && session.className === normalizeClassName(className) ? session.studentName : "";
+    const assignment = latestAssignmentForClass(data, className, studentName);
     if (!assignment) {
       sendJson(res, 404, { error: "이 반에 등록된 과제가 아직 없습니다." });
       return;
@@ -1137,8 +1147,11 @@ async function handleApi(req, res, pathname) {
   if (req.method === "GET" && classAssignmentsMatch) {
     const className = decodeURIComponent(classAssignmentsMatch[1]);
     const targetClass = normalizeClassName(className);
+    const session = studentSession(req, data);
+    const studentName = session && session.className === targetClass ? session.studentName : "";
     const assignments = data.assignments
       .filter((assignment) => normalizeClassName(assignment.className) === targetClass)
+      .filter((assignment) => !studentName || studentsForAssignment(data, assignment).includes(studentName))
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map(publicAssignment);
@@ -1215,9 +1228,19 @@ async function handleApi(req, res, pathname) {
     const title = normalizeText(body.title) || `${dateLabel} 과제 ${book}`.trim();
     const detail = normalizeText(body.detail);
     const problems = books ? books.flatMap((range) => range.problems).map(String) : null;
+    const classStudents = studentsForClass(data, className);
+    const requestedStudentNames = Array.isArray(body.students)
+      ? [...new Set(body.students.map(normalizeText).filter(Boolean))]
+      : [];
+    const unknownStudents = requestedStudentNames.filter((student) => !classStudents.includes(student));
+    const requestedStudents = requestedStudentNames.filter((student) => classStudents.includes(student));
 
     if (!dateLabel || !book || !problems) {
       sendJson(res, 400, { error: "날짜, 교재명, 문제 범위를 확인해 주세요." });
+      return;
+    }
+    if (unknownStudents.length > 0) {
+      sendJson(res, 400, { error: `반 명단에 없는 학생입니다: ${unknownStudents.join(", ")}` });
       return;
     }
 
@@ -1231,6 +1254,7 @@ async function handleApi(req, res, pathname) {
       title,
       detail,
       problems,
+      students: requestedStudents,
       createdAt: new Date().toISOString(),
       responses: [],
     };
@@ -1277,7 +1301,7 @@ async function handleApi(req, res, pathname) {
     const submittedFiles = Array.isArray(body.files) ? body.files : [];
     const validSet = new Set(assignment.problems);
     const problems = [...new Set(checked)].filter((problem) => validSet.has(problem));
-    const latestAssignment = latestAssignmentForClass(data, assignment.className);
+    const latestAssignment = latestAssignmentForClass(data, assignment.className, studentName);
     const isPastAssignment = Boolean(latestAssignment && latestAssignment.id !== assignment.id);
     const hasSubmittedPhoto = submittedFiles.some((file) => file && /^image\//.test(file.mimeType));
 
