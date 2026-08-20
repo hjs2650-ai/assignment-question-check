@@ -86,7 +86,6 @@ let passwordRequiredStudents = new Set();
 let activeStudentSession = null;
 let targetClassName = routeType === "class" ? routeValue : "";
 let recordsLoadedForMonth = "";
-const MAX_PHOTOS = 20;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -623,9 +622,6 @@ function addSelectedPhotos(input, selectedFiles, list) {
   const incomingFiles = [...input.files].filter(isImageFile);
 
   for (const file of incomingFiles) {
-    if (selectedFiles.length >= MAX_PHOTOS) {
-      break;
-    }
     const key = fileKey(file);
     if (!existingKeys.has(key)) {
       selectedFiles.push(file);
@@ -638,7 +634,7 @@ function addSelectedPhotos(input, selectedFiles, list) {
 }
 
 async function selectedPhotosPayload(files) {
-  const selectedFiles = files.filter(isImageFile).slice(0, MAX_PHOTOS);
+  const selectedFiles = files.filter(isImageFile);
   return selectedFiles.map((file) => ({
     name: file.name,
     mimeType: file.type.startsWith("image/") ? file.type : "image/jpeg",
