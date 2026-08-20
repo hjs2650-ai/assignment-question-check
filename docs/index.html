@@ -8,32 +8,52 @@
     <meta property="og:title" content="과제 클리어체크" />
     <meta property="og:description" content="오늘의 미션을 준비하고 있습니다." />
     <meta property="og:image" content="./assets/teacher-character.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="loader-shell">
-      <section class="loader-card">
-        <div class="class-pill" id="className">과제 확인 중</div>
-        <img class="teacher" src="./assets/teacher-character.png" alt="" />
-        <div class="copy">
-          <p class="eyebrow">오늘의 미션</p>
-          <h1>과제 화면 준비 중</h1>
-          <p class="range">잠시만 기다려 주세요.</p>
-          <p class="daily-note" id="dailyNote">오늘도 좋은 하루 보내자!</p>
-          <p class="muted" id="statusText" hidden></p>
-          <div class="progress" aria-hidden="true"><span></span></div>
+      <header class="loader-header">
+        <div class="loader-brand">
+          <img class="teacher" src="./assets/teacher-character.png" alt="" />
+          <div>
+            <strong>황종선T 학생관리</strong>
+            <span>과제 클리어체크</span>
+          </div>
         </div>
+        <div class="class-pill" id="className">과제 확인 중</div>
+      </header>
+
+      <section class="loader-welcome">
+        <span class="ready-label">READY</span>
+        <p class="eyebrow">오늘의 미션</p>
+        <h1>과제 화면 준비 중</h1>
+        <p class="range">잠시만 기다려 주세요.</p>
+        <p class="daily-note" id="dailyNote">오늘도 좋은 하루 보내자!</p>
+        <p class="muted" id="statusText">과제 정보를 확인하고 있어요.</p>
+        <div class="progress" aria-hidden="true"><span></span></div>
       </section>
 
-      <section class="preview-panel" aria-hidden="true">
+      <section class="preview-panel">
         <div class="preview-head">
-          <strong>도와줘요 쌤</strong>
-          <span>0개 선택</span>
+          <strong>내 학습 한눈에</strong>
+          <span>불러오는 중</span>
         </div>
         <div class="preview-grid">
-          <i></i><i></i><i></i><i></i><i></i><i></i>
+          <div class="preview-stat homework"><span>과제 완료</span><i></i></div>
+          <div class="preview-stat attendance"><span>이번 달 출석</span><i></i></div>
+          <div class="preview-stat tests"><span>테스트 기록</span><i></i></div>
+          <div class="preview-stat videos"><span>수업영상</span><i></i></div>
         </div>
-        <div class="preview-upload">과제 사진 첨부</div>
+        <div class="preview-assignment">
+          <div>
+            <span>이번 과제</span>
+            <strong>오늘의 미션을 불러오고 있어요</strong>
+          </div>
+          <b>잠시만</b>
+        </div>
       </section>
     </main>
 
@@ -117,9 +137,9 @@
         }
 
         const messages = [
-          "서버를 깨우고 과제를 불러오는 중입니다.",
-          "거의 준비됐습니다. 잠시만 기다려 주세요.",
-          "과제 화면으로 곧 이동합니다.",
+          "과제 정보를 확인하고 있어요.",
+          "거의 준비됐어요. 잠시만 기다려 주세요.",
+          "과제 화면으로 곧 이동할게요.",
         ];
 
         for (let attempt = 0; attempt < 8; attempt += 1) {
