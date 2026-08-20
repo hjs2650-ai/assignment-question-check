@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>황종선T 학생관리</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="teacher-app-body">
+    <main class="shell teacher-shell">
+      <section class="topbar teacher-dashboard-header">
+        <div class="teacher-dashboard-brand">
+          <img src="/assets/teacher-character.png" alt="" />
+          <div>
+            <p class="eyebrow">선생님 화면</p>
+            <h1>황종선T 학생관리</h1>
+            <p id="todayClassLabel" class="muted teacher-day-label"></p>
+          </div>
+        </div>
+        <button class="ghost" id="refreshButton">새로고침</button>
+      </section>
+
+      <nav class="teacher-main-tabs" aria-label="학생관리 메뉴">
+        <button class="teacher-main-tab is-active" type="button" data-module="assignments" aria-selected="true">과제</button>
+        <button class="teacher-main-tab" type="button" data-module="attendance" aria-selected="false">출결</button>
+        <button class="teacher-main-tab" type="button" data-module="tests" aria-selected="false">테스트</button>
+        <button class="teacher-main-tab" type="button" data-module="monthly" aria-selected="false">월간 리포트</button>
+      </nav>
+
+      <section class="panel teacher-class-switcher">
+        <div id="teacherClassTabs" class="teacher-class-tabs" role="tablist" aria-label="관리할 반"></div>
+      </section>
+
+      <div id="assignmentManagementModule" class="teacher-module">
+      <section class="panel teacher-dashboard">
+        <div class="teacher-view-head">
+          <div>
+            <p id="selectedClassContext" class="eyebrow"></p>
+            <h2 id="selectedClassTitle">반을 불러오는 중</h2>
+          </div>
+          <div class="teacher-mode-tabs" role="tablist" aria-label="과제 구분">
+            <button id="currentAssignmentTab" class="teacher-mode-tab is-active" type="button" role="tab" aria-selected="true">이번 과제</button>
+            <button id="pastAssignmentsTab" class="teacher-mode-tab" type="button" role="tab" aria-selected="false">지난 과제</button>
+            <button id="cumulativeMissingTab" class="teacher-mode-tab" type="button" role="tab" aria-selected="false">누적 미제출</button>
+          </div>
+        </div>
+        <div id="selectedClassSummary" class="teacher-summary-strip"></div>
+        <div id="assignmentList" class="assignment-list focused-assignment-list"></div>
+      </section>
+
+      <section class="panel teacher-tools-panel">
+        <details class="compact-section">
+          <summary>관리 도구</summary>
+          <details class="create-assignment nested-tool">
+            <summary>새 과제 만들기</summary>
+          <form id="assignmentForm" class="form-grid">
+            <label>
+              반 이름
+              <input name="className" list="classOptions" value="고1 제니트Z2" placeholder="예: 고1 제니트Z2" required />
+              <datalist id="classOptions"></datalist>
+            </label>
+            <label>
+              날짜
+              <input name="dateLabel" value="7/7" placeholder="예: 7/7" required />
+            </label>
+            <label>
+              교재명
+              <input name="book" value="고쟁이" placeholder="예: 고쟁이" />
+            </label>
+            <label>
+              시작 번호
+              <input name="startNumber" type="number" min="1" value="1" />
+            </label>
+            <label>
+              끝 번호
+              <input name="endNumber" type="number" min="1" value="100" />
+            </label>
+            <label>
+              배경 테마
+              <select name="theme">
+                <option value="focus">집중</option>
+                <option value="fresh">산뜻</option>
+                <option value="paper">노트</option>
+                <option value="night">차분</option>
+              </select>
+            </label>
+            <label class="wide">
+              여러 교재 입력
+              <textarea name="bookRanges" rows="3" placeholder="예: 고쟁이 1~40&#10;쎈 50~84"></textarea>
+            </label>
+            <label class="wide">
+              제목
+              <input name="title" value="7/7 과제 고쟁이 1번부터 100번까지" />
+            </label>
+            <label class="wide">
+              안내 내용
+              <textarea name="detail" rows="2" placeholder="학생에게 보일 안내를 적어 주세요.">질문할 문제를 모두 체크하고 이름을 입력해 주세요.</textarea>
+            </label>
+            <button class="primary" type="submit">과제 만들기</button>
+          </form>
+          </details>
+          <details class="compact-section nested-tool">
+            <summary>
+              <span>반별 고정 링크</span>
+              <span id="classCount" class="badge">0개</span>
+            </summary>
+            <div id="classList" class="class-list"></div>
+          </details>
+          <details id="studentPasswordSettings" class="compact-section nested-tool">
+            <summary>
+              <span>학생 비밀번호 설정</span>
+              <span id="passwordClassLabel" class="badge">반 선택</span>
+            </summary>
+            <p class="muted password-settings-help">
+              학생관리 로그인에 사용할 숫자 4자리 비밀번호입니다. 미설정 학생은 로그인할 수 없습니다.
+            </p>
+            <div id="studentPasswordList" class="student-password-list"></div>
+            <p id="studentPasswordMessage" class="message"></p>
+          </details>
+        </details>
+        <span id="assignmentCount" class="visually-hidden">0개</span>
+      </section>
+      </div>
+
+      <section id="attendanceManagementModule" class="panel teacher-module" hidden>
+        <div class="management-module-head">
+          <div>
+            <p class="eyebrow">예외만 수정하면 되는 출결</p>
+            <h2>출결 관리</h2>
+          </div>
+          <label>
+            확인할 달
+            <input id="attendanceMonth" type="month" />
+          </label>
+        </div>
+        <div id="attendanceSummary" class="management-summary-strip"></div>
+        <div id="attendanceDateTabs" class="attendance-date-tabs"></div>
+        <section id="attendanceEditor" class="attendance-editor" hidden>
+          <div class="attendance-editor-head">
+            <div>
+              <p id="attendanceDateLabel" class="eyebrow"></p>
+              <h3>학생 출결</h3>
+            </div>
+            <label class="no-class-toggle">
+              <input id="attendanceNoClass" type="checkbox" />
+              <span>이날은 휴강·방학</span>
+            </label>
+          </div>
+          <div id="attendanceStudentList" class="attendance-student-list"></div>
+          <label>
+            출결 메모
+            <input id="attendanceNote" placeholder="예: 학원 방학, 보강 수업" />
+          </label>
+          <div class="actions">
+            <button id="saveAttendanceButton" class="primary" type="button">출결 저장</button>
+          </div>
+          <p id="attendanceMessage" class="message"></p>
+        </section>
+      </section>
+
+      <section id="testManagementModule" class="panel teacher-module" hidden>
+        <div class="management-module-head">
+          <div>
+            <p class="eyebrow">점수와 변화 누적</p>
+            <h2>테스트 관리</h2>
+          </div>
+        </div>
+        <form id="createTestForm" class="test-create-form">
+          <label>
+            날짜
+            <input name="date" type="date" required />
+          </label>
+          <label>
+            테스트명
+            <input name="name" placeholder="예: 집합과 명제 일일테스트" required />
+          </label>
+          <label>
+            만점
+            <input name="maxScore" type="number" min="1" value="100" required />
+          </label>
+          <button class="primary" type="submit">테스트 만들기</button>
+        </form>
+        <div class="test-workspace">
+          <aside>
+            <h3>테스트 목록</h3>
+            <div id="teacherTestList" class="teacher-test-list"></div>
+          </aside>
+          <section id="testScoreEditor" class="test-score-editor" hidden>
+            <div class="test-score-editor-head">
+              <div>
+                <p id="selectedTestDate" class="eyebrow"></p>
+                <h3 id="selectedTestTitle"></h3>
+              </div>
+              <button id="deleteTestButton" class="ghost danger" type="button">삭제</button>
+            </div>
+            <div id="testScoreRows" class="test-score-rows"></div>
+            <button id="saveTestScoresButton" class="primary" type="button">점수 저장</button>
+            <p id="testMessage" class="message"></p>
+          </section>
+        </div>
+        <section class="test-cumulative-section">
+          <h3>학생별 누적 성적</h3>
+          <div id="testCumulativeTable" class="test-cumulative-table"></div>
+        </section>
+      </section>
+
+      <section id="monthlyManagementModule" class="panel teacher-module" hidden>
+        <div class="management-module-head">
+          <div>
+            <p class="eyebrow">학부모 안내용 월간 요약</p>
+            <h2>월간 리포트</h2>
+          </div>
+          <label>
+            결과 월
+            <input id="monthlyReportMonth" type="month" />
+          </label>
+        </div>
+        <div id="monthlyStudentList" class="monthly-student-list"></div>
+        <section id="monthlyReportPreview" class="monthly-report-preview" hidden></section>
+        <p id="monthlyReportMessage" class="message"></p>
+      </section>
+    </main>
+
+    <template id="assignmentTemplate">
+      <article class="assignment">
+        <div class="assignment-head">
+          <div>
+            <p class="eyebrow class-name"></p>
+            <h3></h3>
+            <p class="muted"></p>
+          </div>
+          <div class="actions">
+            <button class="copy-class-link" type="button">반 링크 복사</button>
+            <button class="copy-link" type="button">이 과제 링크 복사</button>
+            <a class="student-link" target="_blank" rel="noreferrer">열기</a>
+          </div>
+        </div>
+        <div class="stats"></div>
+        <div class="problem-grid"></div>
+        <details>
+          <summary>학생별 제출 보기</summary>
+          <div class="responses"></div>
+        </details>
+      </article>
+    </template>
+
+    <script src="/teacher.js"></script>
+  </body>
+</html>
