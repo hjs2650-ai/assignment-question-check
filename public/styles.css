@@ -2237,7 +2237,7 @@ body[data-theme="night"] .range-text {
   --student-line: #e7e4e5;
   background: var(--student-bg);
   color: var(--student-ink);
-  font-family: "Gowun Dodum", "Malgun Gothic", sans-serif;
+  font-family: "Gaegu", "Gowun Dodum", "Malgun Gothic", sans-serif;
 }
 
 .student-app-body h1,
@@ -2973,7 +2973,7 @@ body[data-theme="night"] .range-text {
   --teacher-line: #e7e2e3;
   background: #f8faf9;
   color: var(--teacher-ink);
-  font-family: "Gowun Dodum", "Malgun Gothic", sans-serif;
+  font-family: "Gaegu", "Gowun Dodum", "Malgun Gothic", sans-serif;
 }
 
 .teacher-app-body h1,
