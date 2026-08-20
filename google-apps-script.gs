@@ -5,6 +5,7 @@ const RESPONSES_SHEET = "RESPONSES";
 const SUMMARY_SHEET = "SUMMARY";
 const STUDENTS_SHEET = "STUDENTS";
 const ROOT_FOLDER_NAME = "과제 질문 체크 제출";
+const DATA_CHUNK_SIZE = 45000;
 
 function doPost(e) {
   try {
@@ -34,7 +35,13 @@ function doPost(e) {
 
 function readData() {
   const sheet = getOrCreateSheet(DATA_SHEET);
-  const raw = sheet.getRange("A1").getValue();
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const raw = sheet
+    .getRange(1, 1, lastRow, 1)
+    .getValues()
+    .map((row) => row[0])
+    .filter(Boolean)
+    .join("");
   if (!raw) {
     return { assignments: [] };
   }
@@ -43,9 +50,14 @@ function readData() {
 
 function writeData(data) {
   const safeData = data && Array.isArray(data.assignments) ? data : { assignments: [] };
+  const serialized = JSON.stringify(safeData);
+  const chunks = [];
+  for (let index = 0; index < serialized.length; index += DATA_CHUNK_SIZE) {
+    chunks.push([serialized.slice(index, index + DATA_CHUNK_SIZE)]);
+  }
   const dataSheet = getOrCreateSheet(DATA_SHEET);
   dataSheet.clear();
-  dataSheet.getRange("A1").setValue(JSON.stringify(safeData));
+  dataSheet.getRange(1, 1, chunks.length, 1).setValues(chunks);
   dataSheet.hideSheet();
 
   writeAssignmentsView(safeData);

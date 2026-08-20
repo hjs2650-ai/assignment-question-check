@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check storage.js"
+    "check": "node --check server.js && node --check storage.js && node --check public/student.js && node --check public/teacher.js"
   },
   "engines": {
     "node": ">=18"

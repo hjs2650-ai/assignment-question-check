@@ -18,12 +18,49 @@ const studentPasswordSettings = document.querySelector("#studentPasswordSettings
 const passwordClassLabel = document.querySelector("#passwordClassLabel");
 const studentPasswordList = document.querySelector("#studentPasswordList");
 const studentPasswordMessage = document.querySelector("#studentPasswordMessage");
+const teacherMainTabs = [...document.querySelectorAll(".teacher-main-tab")];
+const assignmentManagementModule = document.querySelector("#assignmentManagementModule");
+const attendanceManagementModule = document.querySelector("#attendanceManagementModule");
+const testManagementModule = document.querySelector("#testManagementModule");
+const monthlyManagementModule = document.querySelector("#monthlyManagementModule");
+const attendanceMonth = document.querySelector("#attendanceMonth");
+const attendanceSummary = document.querySelector("#attendanceSummary");
+const attendanceDateTabs = document.querySelector("#attendanceDateTabs");
+const attendanceEditor = document.querySelector("#attendanceEditor");
+const attendanceDateLabel = document.querySelector("#attendanceDateLabel");
+const attendanceNoClass = document.querySelector("#attendanceNoClass");
+const attendanceStudentList = document.querySelector("#attendanceStudentList");
+const attendanceNote = document.querySelector("#attendanceNote");
+const saveAttendanceButton = document.querySelector("#saveAttendanceButton");
+const attendanceMessage = document.querySelector("#attendanceMessage");
+const createTestForm = document.querySelector("#createTestForm");
+const teacherTestList = document.querySelector("#teacherTestList");
+const testScoreEditor = document.querySelector("#testScoreEditor");
+const selectedTestDate = document.querySelector("#selectedTestDate");
+const selectedTestTitle = document.querySelector("#selectedTestTitle");
+const testScoreRows = document.querySelector("#testScoreRows");
+const saveTestScoresButton = document.querySelector("#saveTestScoresButton");
+const deleteTestButton = document.querySelector("#deleteTestButton");
+const testMessage = document.querySelector("#testMessage");
+const testCumulativeTable = document.querySelector("#testCumulativeTable");
+const monthlyReportMonth = document.querySelector("#monthlyReportMonth");
+const monthlyStudentList = document.querySelector("#monthlyStudentList");
+const monthlyReportPreview = document.querySelector("#monthlyReportPreview");
+const monthlyReportMessage = document.querySelector("#monthlyReportMessage");
 const defaultClasses = [];
 const fixedClassOrder = ["고1 1티어D3", "고1 제니트Z2", "고1 SKYA3"];
 let latestAssignments = [];
 let selectedClassName = "";
 let assignmentViewMode = "current";
 let selectedPastAssignmentId = "";
+let teacherModule = "assignments";
+let teacherClasses = [];
+let attendanceData = null;
+let selectedAttendanceDate = "";
+let teacherTests = [];
+let testStudents = [];
+let selectedTestId = "";
+let monthlyData = null;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -228,6 +265,410 @@ function todayLabel() {
     day: "numeric",
     weekday: "long",
   }).format(new Date());
+}
+
+function localIsoDate() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function localMonth() {
+  return localIsoDate().slice(0, 7);
+}
+
+function displayIsoDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${Number(match[2])}/${Number(match[3])}` : value;
+}
+
+function attendanceStatusLabel(status) {
+  return {
+    present: "출석",
+    late: "지각",
+    absent: "결석",
+    early: "조퇴",
+    makeup: "보강",
+  }[status] || "출석";
+}
+
+function percentText(value) {
+  return value === null || value === undefined ? "-" : `${value}%`;
+}
+
+async function loadActiveTeacherModule() {
+  if (!selectedClassName) {
+    return;
+  }
+  if (teacherModule === "attendance") {
+    await loadAttendance();
+  } else if (teacherModule === "tests") {
+    await loadTests();
+  } else if (teacherModule === "monthly") {
+    await loadMonthlyReport();
+  }
+}
+
+function setTeacherModule(module) {
+  teacherModule = module;
+  assignmentManagementModule.hidden = module !== "assignments";
+  attendanceManagementModule.hidden = module !== "attendance";
+  testManagementModule.hidden = module !== "tests";
+  monthlyManagementModule.hidden = module !== "monthly";
+  teacherMainTabs.forEach((button) => {
+    const active = button.dataset.module === module;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  if (module === "assignments") {
+    renderFocusedDashboard();
+    return;
+  }
+  loadActiveTeacherModule().catch((error) => {
+    const target = module === "attendance" ? attendanceMessage : module === "tests" ? testMessage : monthlyReportMessage;
+    target.className = "message error";
+    target.textContent = error.message;
+  });
+}
+
+function attendanceDateSummary(row) {
+  if (row.noClass) {
+    return "휴강";
+  }
+  if (row.future) {
+    return "예정";
+  }
+  const statuses = Object.values(row.statuses || {});
+  const exceptions = statuses.filter((status) => status !== "present").length;
+  return exceptions ? `특이 ${exceptions}명` : "전원 출석";
+}
+
+function renderAttendanceEditor() {
+  const row = attendanceData?.dates.find((item) => item.date === selectedAttendanceDate);
+  if (!row) {
+    attendanceEditor.hidden = true;
+    return;
+  }
+  attendanceEditor.hidden = false;
+  attendanceDateLabel.textContent = `${displayIsoDate(row.date)} 수업`;
+  attendanceNoClass.checked = row.noClass;
+  attendanceNote.value = row.note || "";
+  attendanceStudentList.innerHTML = Object.entries(row.statuses || {})
+    .map(
+      ([student, status]) => `
+        <div class="attendance-student-row">
+          <strong>${escapeHtml(student)}</strong>
+          <select data-student="${escapeHtml(student)}" ${row.noClass ? "disabled" : ""} aria-label="${escapeHtml(student)} 출결">
+            ${["present", "late", "absent", "early", "makeup"]
+              .map((value) => `<option value="${value}" ${value === status ? "selected" : ""}>${attendanceStatusLabel(value)}</option>`)
+              .join("")}
+          </select>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function renderAttendance() {
+  const pastRows = (attendanceData?.dates || []).filter((row) => !row.future && !row.noClass);
+  const allStatuses = pastRows.flatMap((row) => Object.values(row.statuses || {}));
+  attendanceSummary.innerHTML = `
+    <div><span>수업</span><strong>${pastRows.length}회</strong></div>
+    <div><span>결석</span><strong>${allStatuses.filter((status) => status === "absent").length}건</strong></div>
+    <div><span>지각</span><strong>${allStatuses.filter((status) => status === "late").length}건</strong></div>
+    <div><span>조퇴</span><strong>${allStatuses.filter((status) => status === "early").length}건</strong></div>
+  `;
+  attendanceDateTabs.innerHTML = attendanceData?.dates?.length
+    ? attendanceData.dates
+        .map(
+          (row) => `
+            <button type="button" class="attendance-date-tab ${row.date === selectedAttendanceDate ? "is-active" : ""} ${row.future ? "is-future" : ""}" data-date="${row.date}">
+              <strong>${escapeHtml(displayIsoDate(row.date))}</strong>
+              <span>${escapeHtml(attendanceDateSummary(row))}</span>
+            </button>
+          `,
+        )
+        .join("")
+    : `<p class="muted">이 반의 수업 요일이 아직 설정되지 않았습니다.</p>`;
+  attendanceDateTabs.querySelectorAll(".attendance-date-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedAttendanceDate = button.dataset.date;
+      renderAttendance();
+      renderAttendanceEditor();
+    });
+  });
+  renderAttendanceEditor();
+}
+
+async function loadAttendance() {
+  const month = attendanceMonth.value || localMonth();
+  attendanceMonth.value = month;
+  attendanceMessage.textContent = "";
+  attendanceData = await api(`/api/classes/${encodeURIComponent(selectedClassName)}/attendance?month=${encodeURIComponent(month)}`);
+  const preferredDate = attendanceData.dates.find((row) => row.date === localIsoDate())?.date;
+  if (!attendanceData.dates.some((row) => row.date === selectedAttendanceDate)) {
+    selectedAttendanceDate = preferredDate || attendanceData.dates.filter((row) => !row.future).at(-1)?.date || attendanceData.dates[0]?.date || "";
+  }
+  renderAttendance();
+}
+
+async function saveAttendance() {
+  if (!selectedAttendanceDate) {
+    return;
+  }
+  const statuses = Object.fromEntries(
+    [...attendanceStudentList.querySelectorAll("select[data-student]")].map((select) => [select.dataset.student, select.value]),
+  );
+  saveAttendanceButton.disabled = true;
+  attendanceMessage.className = "message";
+  attendanceMessage.textContent = "저장 중입니다.";
+  try {
+    await api(`/api/classes/${encodeURIComponent(selectedClassName)}/attendance`, {
+      method: "POST",
+      body: JSON.stringify({
+        date: selectedAttendanceDate,
+        noClass: attendanceNoClass.checked,
+        note: attendanceNote.value,
+        statuses,
+      }),
+    });
+    attendanceMessage.className = "message success";
+    attendanceMessage.textContent = "출결을 저장했습니다.";
+    await loadAttendance();
+  } finally {
+    saveAttendanceButton.disabled = false;
+  }
+}
+
+function selectedTest() {
+  return teacherTests.find((test) => test.id === selectedTestId);
+}
+
+function renderTestCumulative() {
+  testCumulativeTable.innerHTML = testStudents.length
+    ? `
+      <div class="test-cumulative-row is-head"><span>학생</span><span>응시</span><span>평균</span><span>최근</span></div>
+      ${testStudents
+        .map((student) => {
+          const results = teacherTests
+            .map((test) => ({ test, result: test.scores?.[student] }))
+            .filter(({ result }) => result && result.score !== null && result.score !== undefined);
+          const percentages = results.map(({ test, result }) => (Number(result.score) / test.maxScore) * 100);
+          const average = percentages.length
+            ? Math.round((percentages.reduce((sum, value) => sum + value, 0) / percentages.length) * 10) / 10
+            : null;
+          const latest = results[0];
+          return `
+            <div class="test-cumulative-row">
+              <strong>${escapeHtml(student)}</strong>
+              <span>${results.length}회</span>
+              <span>${percentText(average)}</span>
+              <span>${latest ? `${escapeHtml(latest.result.score)}/${escapeHtml(latest.test.maxScore)}` : "-"}</span>
+            </div>
+          `;
+        })
+        .join("")}
+    `
+    : `<p class="muted">학생 명단이 없습니다.</p>`;
+}
+
+function renderTestEditor() {
+  const test = selectedTest();
+  if (!test) {
+    testScoreEditor.hidden = true;
+    return;
+  }
+  testScoreEditor.hidden = false;
+  selectedTestDate.textContent = `${displayIsoDate(test.date)} · ${test.maxScore}점 만점`;
+  selectedTestTitle.textContent = test.name;
+  testScoreRows.innerHTML = testStudents
+    .map((student) => {
+      const result = test.scores?.[student] || { score: null, absent: false, note: "" };
+      return `
+        <div class="test-score-row">
+          <strong>${escapeHtml(student)}</strong>
+          <label>
+            점수
+            <input class="student-test-score" data-student="${escapeHtml(student)}" type="number" min="0" max="${escapeHtml(test.maxScore)}" value="${result.score ?? ""}" ${result.absent ? "disabled" : ""} />
+          </label>
+          <label class="test-absent-check">
+            <input class="student-test-absent" data-student="${escapeHtml(student)}" type="checkbox" ${result.absent ? "checked" : ""} />
+            미응시
+          </label>
+          <label>
+            메모
+            <input class="student-test-note" data-student="${escapeHtml(student)}" value="${escapeHtml(result.note || "")}" placeholder="선택" />
+          </label>
+        </div>
+      `;
+    })
+    .join("");
+  testScoreRows.querySelectorAll(".student-test-absent").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const scoreInput = testScoreRows.querySelector(`.student-test-score[data-student="${CSS.escape(checkbox.dataset.student)}"]`);
+      scoreInput.disabled = checkbox.checked;
+      if (checkbox.checked) {
+        scoreInput.value = "";
+      }
+    });
+  });
+}
+
+function renderTests() {
+  teacherTestList.innerHTML = teacherTests.length
+    ? teacherTests
+        .map(
+          (test) => `
+            <button class="teacher-test-item ${test.id === selectedTestId ? "is-active" : ""}" type="button" data-id="${test.id}">
+              <strong>${escapeHtml(test.name)}</strong>
+              <span>${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점</span>
+            </button>
+          `,
+        )
+        .join("")
+    : `<p class="muted">아직 만든 테스트가 없습니다.</p>`;
+  teacherTestList.querySelectorAll(".teacher-test-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedTestId = button.dataset.id;
+      renderTests();
+      renderTestEditor();
+    });
+  });
+  renderTestEditor();
+  renderTestCumulative();
+}
+
+async function loadTests() {
+  testMessage.textContent = "";
+  const payload = await api(`/api/classes/${encodeURIComponent(selectedClassName)}/tests`);
+  teacherTests = payload.tests || [];
+  testStudents = payload.students || [];
+  if (!teacherTests.some((test) => test.id === selectedTestId)) {
+    selectedTestId = teacherTests[0]?.id || "";
+  }
+  renderTests();
+}
+
+async function saveTestScores() {
+  const test = selectedTest();
+  if (!test) {
+    return;
+  }
+  const scores = Object.fromEntries(
+    testStudents.map((student) => {
+      const scoreInput = testScoreRows.querySelector(`.student-test-score[data-student="${CSS.escape(student)}"]`);
+      const absentInput = testScoreRows.querySelector(`.student-test-absent[data-student="${CSS.escape(student)}"]`);
+      const noteInput = testScoreRows.querySelector(`.student-test-note[data-student="${CSS.escape(student)}"]`);
+      return [
+        student,
+        {
+          score: scoreInput.value === "" ? null : Number(scoreInput.value),
+          absent: absentInput.checked,
+          note: noteInput.value,
+        },
+      ];
+    }),
+  );
+  saveTestScoresButton.disabled = true;
+  testMessage.className = "message";
+  testMessage.textContent = "점수를 저장하는 중입니다.";
+  try {
+    await api(`/api/tests/${encodeURIComponent(test.id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ scores }),
+    });
+    testMessage.className = "message success";
+    testMessage.textContent = "점수를 저장했습니다.";
+    await loadTests();
+  } finally {
+    saveTestScoresButton.disabled = false;
+  }
+}
+
+function monthlyNarrative(row) {
+  const parts = [];
+  if (row.homework.total) {
+    parts.push(`과제는 ${row.homework.total}회 중 ${row.homework.submitted}회 제출했습니다.`);
+  }
+  if (row.attendance.total) {
+    parts.push(`출결은 ${row.attendance.attended}/${row.attendance.total}회 출석으로 확인됩니다.`);
+  }
+  if (row.tests.count) {
+    parts.push(`이번 달 테스트 평균은 ${row.tests.averagePercent}%입니다.`);
+  }
+  return parts.length ? parts.join(" ") : "이번 달 기록이 쌓이면 학습 흐름을 자세히 안내할 수 있습니다.";
+}
+
+function showMonthlyPreview(studentName) {
+  const row = monthlyData?.students.find((student) => student.studentName === studentName);
+  if (!row) {
+    return;
+  }
+  monthlyReportPreview.hidden = false;
+  monthlyReportPreview.innerHTML = `
+    <div class="monthly-report-sheet">
+      <div class="monthly-report-title">
+        <p>${escapeHtml(monthlyData.month.replace("-", "년 "))}월 학습 리포트</p>
+        <h2>${escapeHtml(row.studentName)} 학생</h2>
+        <span>${escapeHtml(monthlyData.className)} · 황종선T</span>
+      </div>
+      <div class="monthly-report-metrics">
+        <div><span>과제 제출률</span><strong>${percentText(row.homework.rate)}</strong><small>${row.homework.submitted}/${row.homework.total}회</small></div>
+        <div><span>출석률</span><strong>${percentText(row.attendance.rate)}</strong><small>결석 ${row.attendance.counts.absent}회 · 지각 ${row.attendance.counts.late}회</small></div>
+        <div><span>테스트 평균</span><strong>${percentText(row.tests.averagePercent)}</strong><small>${row.tests.count}회 응시</small></div>
+        <div><span>질문 문항</span><strong>${row.homework.questionCount}개</strong><small>이번 달 체크</small></div>
+      </div>
+      <div class="monthly-report-comment">
+        <h3>이번 달 학습 이야기</h3>
+        <p contenteditable="true">${escapeHtml(monthlyNarrative(row))}</p>
+      </div>
+      <div class="monthly-report-sign">황종선T</div>
+    </div>
+    <div class="monthly-report-actions">
+      <span class="muted">학습 이야기 문장은 눌러서 수정할 수 있습니다.</span>
+      <button id="printMonthlyReport" class="primary" type="button">인쇄·PDF 저장</button>
+    </div>
+  `;
+  document.querySelector("#printMonthlyReport").addEventListener("click", () => window.print());
+  monthlyReportPreview.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderMonthlyReport() {
+  monthlyStudentList.innerHTML = monthlyData?.students?.length
+    ? `
+      <div class="monthly-student-row is-head"><span>학생</span><span>과제</span><span>출석</span><span>테스트</span><span></span></div>
+      ${monthlyData.students
+        .map(
+          (row) => `
+            <div class="monthly-student-row">
+              <strong>${escapeHtml(row.studentName)}</strong>
+              <span>${percentText(row.homework.rate)}</span>
+              <span>${percentText(row.attendance.rate)}</span>
+              <span>${percentText(row.tests.averagePercent)}</span>
+              <button class="ghost preview-monthly-student" type="button" data-student="${escapeHtml(row.studentName)}">미리보기</button>
+            </div>
+          `,
+        )
+        .join("")}
+    `
+    : `<p class="muted">학생 명단이 없습니다.</p>`;
+  monthlyStudentList.querySelectorAll(".preview-monthly-student").forEach((button) => {
+    button.addEventListener("click", () => showMonthlyPreview(button.dataset.student));
+  });
+}
+
+async function loadMonthlyReport() {
+  const month = monthlyReportMonth.value || localMonth();
+  monthlyReportMonth.value = month;
+  monthlyReportMessage.textContent = "";
+  monthlyReportPreview.hidden = true;
+  monthlyData = await api(`/api/classes/${encodeURIComponent(selectedClassName)}/monthly?month=${encodeURIComponent(month)}`);
+  renderMonthlyReport();
 }
 
 async function copyToClipboard(text, button, label) {
@@ -733,6 +1174,7 @@ function bindRenderedAssignmentActions() {
 }
 
 function renderTeacherClassTabs(classes) {
+  teacherClasses = classes;
   const scheduledClass = classForDay();
   teacherClassTabs.innerHTML = classes
     .map(
@@ -750,7 +1192,19 @@ function renderTeacherClassTabs(classes) {
       selectedClassName = button.dataset.class;
       assignmentViewMode = "current";
       selectedPastAssignmentId = "";
-      renderFocusedDashboard();
+      selectedAttendanceDate = "";
+      selectedTestId = "";
+      monthlyReportPreview.hidden = true;
+      if (teacherModule === "assignments") {
+        renderFocusedDashboard();
+      } else {
+        renderTeacherClassTabs(teacherClasses);
+        loadActiveTeacherModule().catch((error) => {
+          const target = teacherModule === "attendance" ? attendanceMessage : teacherModule === "tests" ? testMessage : monthlyReportMessage;
+          target.className = "message error";
+          target.textContent = error.message;
+        });
+      }
       if (studentPasswordSettings.open) {
         loadStudentPasswordSettings();
       }
@@ -781,7 +1235,7 @@ function renderFocusedDashboard() {
   const [currentAssignment, ...pastAssignments] = assignments;
   const contextLabel = selectedClassName === scheduledClass ? (day === 0 ? "다음 수업" : "오늘 수업") : "선택한 반";
 
-  renderTeacherClassTabs(groups.map((item) => item.className));
+  renderTeacherClassTabs(teacherClasses.length ? teacherClasses : groups.map((item) => item.className));
   selectedClassTitle.textContent = selectedClassName || "과제 없음";
   selectedClassContext.textContent = contextLabel;
   passwordClassLabel.textContent = shortClassName(selectedClassName);
@@ -844,7 +1298,7 @@ function renderFocusedDashboard() {
   bindRenderedAssignmentActions();
 }
 
-function renderAssignments(assignments) {
+function renderAssignments(assignments, knownClasses = []) {
   const orderedAssignments = assignments.slice().sort((a, b) => compareByClassOrder(a, b) || b.createdAt.localeCompare(a.createdAt));
   latestAssignments = orderedAssignments;
   countBadge.textContent = `${orderedAssignments.length}개`;
@@ -857,7 +1311,8 @@ function renderAssignments(assignments) {
     return;
   }
 
-  const classes = groupedByClass(orderedAssignments).map((group) => group.className);
+  const classes = [...new Set([...knownClasses, ...groupedByClass(orderedAssignments).map((group) => group.className)])].sort(compareByClassOrder);
+  teacherClasses = classes;
   const scheduledClass = classForDay();
   if (!classes.includes(selectedClassName)) {
     selectedClassName = classes.includes(scheduledClass) ? scheduledClass : classes[0];
@@ -870,8 +1325,8 @@ function renderAssignments(assignments) {
 }
 
 async function loadAssignments() {
-  const payload = await api("/api/assignments");
-  renderAssignments(payload.assignments);
+  const [payload, classPayload] = await Promise.all([api("/api/assignments"), api("/api/classes")]);
+  renderAssignments(payload.assignments, (classPayload.classes || []).map((item) => item.name));
 }
 
 form.addEventListener("submit", async (event) => {
@@ -884,7 +1339,10 @@ form.addEventListener("submit", async (event) => {
   await loadAssignments();
 });
 
-refreshButton.addEventListener("click", loadAssignments);
+refreshButton.addEventListener("click", async () => {
+  await loadAssignments();
+  await loadActiveTeacherModule();
+});
 currentAssignmentTab.addEventListener("click", () => {
   assignmentViewMode = "current";
   renderFocusedDashboard();
@@ -903,4 +1361,94 @@ studentPasswordSettings.addEventListener("toggle", () => {
     loadStudentPasswordSettings();
   }
 });
+
+teacherMainTabs.forEach((button) => {
+  button.addEventListener("click", () => setTeacherModule(button.dataset.module));
+});
+
+attendanceMonth.addEventListener("change", () => {
+  selectedAttendanceDate = "";
+  loadAttendance().catch((error) => {
+    attendanceMessage.className = "message error";
+    attendanceMessage.textContent = error.message;
+  });
+});
+
+attendanceNoClass.addEventListener("change", () => {
+  attendanceStudentList.querySelectorAll("select").forEach((select) => {
+    select.disabled = attendanceNoClass.checked;
+  });
+});
+
+saveAttendanceButton.addEventListener("click", () => {
+  saveAttendance().catch((error) => {
+    attendanceMessage.className = "message error";
+    attendanceMessage.textContent = error.message;
+    saveAttendanceButton.disabled = false;
+  });
+});
+
+createTestForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = createTestForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  testMessage.className = "message";
+  testMessage.textContent = "테스트를 만드는 중입니다.";
+  try {
+    const body = Object.fromEntries(new FormData(createTestForm));
+    const created = await api(`/api/classes/${encodeURIComponent(selectedClassName)}/tests`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    selectedTestId = created.id;
+    createTestForm.reset();
+    createTestForm.elements.date.value = localIsoDate();
+    createTestForm.elements.maxScore.value = "100";
+    testMessage.className = "message success";
+    testMessage.textContent = "테스트를 만들었습니다. 학생별 점수를 입력해 주세요.";
+    await loadTests();
+  } catch (error) {
+    testMessage.className = "message error";
+    testMessage.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+saveTestScoresButton.addEventListener("click", () => {
+  saveTestScores().catch((error) => {
+    testMessage.className = "message error";
+    testMessage.textContent = error.message;
+    saveTestScoresButton.disabled = false;
+  });
+});
+
+deleteTestButton.addEventListener("click", async () => {
+  const test = selectedTest();
+  if (!test || !window.confirm(`${test.name} 테스트를 삭제하시겠습니까?`)) {
+    return;
+  }
+  deleteTestButton.disabled = true;
+  try {
+    await api(`/api/tests/${encodeURIComponent(test.id)}`, { method: "DELETE" });
+    selectedTestId = "";
+    await loadTests();
+  } catch (error) {
+    testMessage.className = "message error";
+    testMessage.textContent = error.message;
+  } finally {
+    deleteTestButton.disabled = false;
+  }
+});
+
+monthlyReportMonth.addEventListener("change", () => {
+  loadMonthlyReport().catch((error) => {
+    monthlyReportMessage.className = "message error";
+    monthlyReportMessage.textContent = error.message;
+  });
+});
+
+attendanceMonth.value = localMonth();
+monthlyReportMonth.value = localMonth();
+createTestForm.elements.date.value = localIsoDate();
 loadAssignments();

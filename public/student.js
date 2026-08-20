@@ -35,6 +35,47 @@ const pastMessage = document.querySelector("#pastMessage");
 const studentMissingCheck = document.querySelector("#studentMissingCheck");
 const checkMissingBtn = document.querySelector("#checkMissingBtn");
 const studentMissingResult = document.querySelector("#studentMissingResult");
+const classVideos = document.querySelector("#classVideos");
+const classVideoList = document.querySelector("#classVideoList");
+const videoEmptyState = document.querySelector("#videoEmptyState");
+const studentAuthLoading = document.querySelector("#studentAuthLoading");
+const studentLoginGate = document.querySelector("#studentLoginGate");
+const studentLoginForm = document.querySelector("#studentLoginForm");
+const loginClassName = document.querySelector("#loginClassName");
+const loginStudentName = document.querySelector("#loginStudentName");
+const loginStudentPassword = document.querySelector("#loginStudentPassword");
+const studentLoginMessage = document.querySelector("#studentLoginMessage");
+const studentApp = document.querySelector("#studentApp");
+const loggedInStudentName = document.querySelector("#loggedInStudentName");
+const loggedInClassName = document.querySelector("#loggedInClassName");
+const studentLogoutButton = document.querySelector("#studentLogoutButton");
+const studentMainTabs = [...document.querySelectorAll(".student-main-tab")];
+const studentHomeView = document.querySelector("#studentHomeView");
+const studentAssignmentView = document.querySelector("#studentAssignmentView");
+const studentRecordsView = document.querySelector("#studentRecordsView");
+const studentVideoView = document.querySelector("#studentVideoView");
+const studentGreetingName = document.querySelector("#studentGreetingName");
+const studentDashboardMonth = document.querySelector("#studentDashboardMonth");
+const homeHomeworkValue = document.querySelector("#homeHomeworkValue");
+const homeAttendanceValue = document.querySelector("#homeAttendanceValue");
+const homeTestValue = document.querySelector("#homeTestValue");
+const homeVideoValue = document.querySelector("#homeVideoValue");
+const homeProgressBar = document.querySelector("#homeProgressBar");
+const homeProgressValue = document.querySelector("#homeProgressValue");
+const homeAssignmentStatus = document.querySelector("#homeAssignmentStatus");
+const homeMissingAlert = document.querySelector("#homeMissingAlert");
+const homeVideoAlert = document.querySelector("#homeVideoAlert");
+const homeStartAssignmentButton = document.querySelector("#homeStartAssignmentButton");
+const homeQuestionButton = document.querySelector("#homeQuestionButton");
+const homePastAssignmentButton = document.querySelector("#homePastAssignmentButton");
+const homeViewButtons = [...document.querySelectorAll("[data-home-view]")];
+const assignmentViewTitle = document.querySelector("#assignmentViewTitle");
+const assignmentViewRange = document.querySelector("#assignmentViewRange");
+const studentRecordMonth = document.querySelector("#studentRecordMonth");
+const studentRecordSummary = document.querySelector("#studentRecordSummary");
+const studentAttendanceHistory = document.querySelector("#studentAttendanceHistory");
+const studentTestHistory = document.querySelector("#studentTestHistory");
+const studentRecordsMessage = document.querySelector("#studentRecordsMessage");
 
 let assignmentId = routeType === "student" ? routeValue : "";
 let availableAssignments = [];
@@ -42,6 +83,9 @@ let currentPhotoFiles = [];
 let pastPhotoFiles = [];
 let activeSubmissionMode = "current";
 let passwordRequiredStudents = new Set();
+let activeStudentSession = null;
+let targetClassName = routeType === "class" ? routeValue : "";
+let recordsLoadedForMonth = "";
 const MAX_PHOTOS = 20;
 
 async function api(path, options = {}) {
@@ -80,7 +124,55 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+async function loadClassVideos(className) {
+  if (!className) {
+    return;
+  }
+  try {
+    const payload = await api(`/api/classes/${encodeURIComponent(className)}/videos`);
+    if (!payload.configured || !payload.videos?.length) {
+      classVideos.hidden = true;
+      videoEmptyState.hidden = false;
+      homeVideoValue.textContent = "등록 영상 없음";
+      homeVideoAlert.querySelector("strong").textContent = "새 수업 영상이 아직 없어요";
+      homeVideoAlert.querySelector("span").textContent = "영상이 등록되면 이곳에서 바로 확인할 수 있어요.";
+      return;
+    }
+
+    classVideoList.innerHTML = payload.videos
+      .map(
+        (video) => `
+          <a class="class-video-item" href="${escapeHtml(video.url)}" target="_blank" rel="noopener noreferrer">
+            <span class="class-video-thumbnail">
+              <img src="${escapeHtml(video.thumbnail)}" alt="" loading="lazy" />
+              <span class="class-video-play" aria-hidden="true"></span>
+            </span>
+            <strong>${escapeHtml(video.title)}</strong>
+          </a>
+        `,
+      )
+      .join("");
+    classVideos.hidden = false;
+    videoEmptyState.hidden = true;
+    homeVideoValue.textContent = `새 영상 ${payload.videos.length}개`;
+    homeVideoAlert.querySelector("strong").textContent = "새 수업 영상이 올라왔어";
+    homeVideoAlert.querySelector("span").textContent = payload.videos[0].title;
+  } catch (error) {
+    classVideos.hidden = true;
+    videoEmptyState.hidden = false;
+    homeVideoValue.textContent = "확인 필요";
+    homeVideoAlert.querySelector("strong").textContent = "수업 영상을 불러오지 못했어요";
+    homeVideoAlert.querySelector("span").textContent = "수업영상 메뉴에서 다시 확인해 주세요.";
+  }
+}
+
 function updatePasswordVisibility() {
+  if (activeStudentSession) {
+    passwordWrap.hidden = true;
+    passwordInput.required = false;
+    passwordInput.value = "";
+    return;
+  }
   const passwordRequired = passwordRequiredStudents.has(nameInput.value.trim());
   passwordWrap.hidden = !passwordRequired;
   passwordInput.required = passwordRequired;
@@ -90,12 +182,236 @@ function updatePasswordVisibility() {
 }
 
 function revealPasswordForError(error) {
+  if (activeStudentSession) {
+    return;
+  }
   if (!String(error && error.message).includes("비밀번호")) {
     return;
   }
   passwordWrap.hidden = false;
   passwordInput.required = true;
   passwordInput.focus();
+}
+
+function localMonthValue() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}`;
+}
+
+function displayIsoDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${Number(match[2])}/${Number(match[3])}` : value;
+}
+
+function attendanceStatusLabel(status) {
+  return {
+    present: "출석",
+    late: "지각",
+    absent: "결석",
+    early: "조퇴",
+    makeup: "보강",
+  }[status] || "출석";
+}
+
+function percentText(value) {
+  return value === null || value === undefined ? "기록 없음" : `${value}%`;
+}
+
+function setStudentMainView(view) {
+  studentHomeView.hidden = view !== "home";
+  studentAssignmentView.hidden = view !== "assignment";
+  studentRecordsView.hidden = view !== "records";
+  studentVideoView.hidden = view !== "videos";
+  studentMainTabs.forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  if (view === "records") {
+    loadStudentRecords().catch((error) => {
+      studentRecordsMessage.className = "message error";
+      studentRecordsMessage.textContent = error.message;
+    });
+  }
+}
+
+function renderStudentHomeSummary(payload) {
+  const homework = payload.homework || {};
+  const attendance = payload.attendance || {};
+  const cumulativeTests = payload.cumulativeTests || {};
+  const homeworkRate = Number.isFinite(Number(homework.rate)) ? Number(homework.rate) : 0;
+
+  studentDashboardMonth.textContent = `${Number(String(payload.month || localMonthValue()).slice(5, 7))}월 기록`;
+  homeHomeworkValue.textContent = `${homework.submitted || 0} / ${homework.total || 0}`;
+  homeAttendanceValue.textContent = `${attendance.attended || 0} / ${attendance.total || 0}`;
+  homeTestValue.textContent = cumulativeTests.averagePercent === null || cumulativeTests.averagePercent === undefined
+    ? "기록 없음"
+    : `${cumulativeTests.averagePercent}%`;
+  homeProgressValue.textContent = homework.rate === null || homework.rate === undefined ? "-" : `${homework.rate}%`;
+  homeProgressBar.style.width = `${Math.max(0, Math.min(100, homeworkRate))}%`;
+}
+
+async function loadStudentHomeStatus() {
+  if (!targetClassName || !activeStudentSession) {
+    return;
+  }
+  try {
+    const payload = await api(`/api/classes/${encodeURIComponent(targetClassName)}/status`);
+    const assignments = payload.assignments || [];
+    const current = assignments.find((assignment) => assignment.id === assignmentId);
+    const missing = assignments.filter((assignment) => !assignment.submitted);
+
+    homeAssignmentStatus.textContent = current?.submitted ? "제출 완료" : "제출 전";
+    homeAssignmentStatus.classList.toggle("is-complete", Boolean(current?.submitted));
+    homeMissingAlert.querySelector("strong").textContent = missing.length
+      ? `미제출 과제 ${missing.length}개가 있어`
+      : "미제출 과제가 없어요";
+    homeMissingAlert.querySelector("span").textContent = missing.length
+      ? `${displayDateLabel(missing[0].dateLabel)} 과제부터 확인해 주세요.`
+      : "지금까지 등록된 과제를 모두 제출했어요.";
+    homeMissingAlert.classList.toggle("is-clear", missing.length === 0);
+  } catch (error) {
+    homeAssignmentStatus.textContent = "확인 필요";
+    homeMissingAlert.querySelector("strong").textContent = "미제출 과제를 불러오지 못했어요";
+    homeMissingAlert.querySelector("span").textContent = "과제 메뉴에서 다시 확인해 주세요.";
+  }
+}
+
+function renderStudentRecords(payload) {
+  const homework = payload.homework || {};
+  const attendance = payload.attendance || { counts: {}, rows: [] };
+  const cumulativeTests = payload.cumulativeTests || { tests: [] };
+  studentRecordSummary.innerHTML = `
+    <div>
+      <span>과제 제출률</span>
+      <strong>${percentText(homework.rate)}</strong>
+      <small>${homework.submitted || 0}/${homework.total || 0}회 제출</small>
+    </div>
+    <div>
+      <span>출석률</span>
+      <strong>${percentText(attendance.rate)}</strong>
+      <small>결석 ${attendance.counts?.absent || 0}회 · 지각 ${attendance.counts?.late || 0}회</small>
+    </div>
+    <div>
+      <span>누적 테스트 평균</span>
+      <strong>${percentText(cumulativeTests.averagePercent)}</strong>
+      <small>${cumulativeTests.count || 0}회 응시</small>
+    </div>
+  `;
+
+  studentAttendanceHistory.innerHTML = attendance.rows?.length
+    ? attendance.rows
+        .slice()
+        .reverse()
+        .map(
+          (row) => `
+            <div class="student-history-row">
+              <strong>${escapeHtml(displayIsoDate(row.date))}</strong>
+              <span class="record-status status-${escapeHtml(row.status)}">${escapeHtml(attendanceStatusLabel(row.status))}</span>
+              <small>${escapeHtml(row.note || "")}</small>
+            </div>
+          `,
+        )
+        .join("")
+    : `<p class="muted">이 달의 출결 기록이 아직 없습니다.</p>`;
+
+  studentTestHistory.innerHTML = cumulativeTests.tests?.length
+    ? cumulativeTests.tests
+        .map(
+          (test) => `
+            <div class="student-history-row test-history-row">
+              <div>
+                <strong>${escapeHtml(test.name)}</strong>
+                <small>${escapeHtml(displayIsoDate(test.date))}</small>
+              </div>
+              <span>${test.absent ? "미응시" : `${escapeHtml(test.score)} / ${escapeHtml(test.maxScore)}`}</span>
+              <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>
+            </div>
+          `,
+        )
+        .join("")
+    : `<p class="muted">등록된 테스트 결과가 아직 없습니다.</p>`;
+
+  renderStudentHomeSummary(payload);
+}
+
+async function loadStudentRecords(force = false) {
+  const month = studentRecordMonth.value || localMonthValue();
+  studentRecordMonth.value = month;
+  if (!force && recordsLoadedForMonth === month) {
+    return;
+  }
+  studentRecordsMessage.className = "message";
+  studentRecordsMessage.textContent = "기록을 불러오는 중입니다.";
+  const payload = await api(`/api/student/records?month=${encodeURIComponent(month)}`);
+  renderStudentRecords(payload);
+  recordsLoadedForMonth = month;
+  studentRecordsMessage.textContent = "";
+}
+
+async function sessionOrNull() {
+  const response = await fetch("/api/student/session", { headers: { "Content-Type": "application/json" } });
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+}
+
+async function resolveTargetClassName() {
+  if (targetClassName) {
+    return targetClassName;
+  }
+  if (routeType === "student" && assignmentId) {
+    const assignment = await api(`/api/assignments/${assignmentId}`);
+    targetClassName = assignment.className;
+  }
+  return targetClassName;
+}
+
+function showStudentLogin() {
+  studentAuthLoading.hidden = true;
+  studentApp.hidden = true;
+  studentLoginGate.hidden = false;
+  loginClassName.textContent = targetClassName;
+  loginStudentName.focus();
+}
+
+async function openStudentApp(session) {
+  activeStudentSession = session;
+  nameInput.value = session.studentName;
+  nameInput.readOnly = true;
+  nameInput.setAttribute("aria-readonly", "true");
+  updatePasswordVisibility();
+  loggedInStudentName.textContent = session.studentName;
+  loggedInClassName.textContent = session.className;
+  studentGreetingName.textContent = session.studentName.length === 3
+    ? session.studentName.slice(1)
+    : session.studentName;
+  studentAuthLoading.hidden = true;
+  studentLoginGate.hidden = true;
+  studentApp.hidden = false;
+  setStudentMainView("home");
+  await loadAssignment();
+  await Promise.allSettled([loadStudentRecords(true), loadStudentHomeStatus()]);
+}
+
+async function bootstrapStudentApp() {
+  studentRecordMonth.value = localMonthValue();
+  await resolveTargetClassName();
+  if (!targetClassName) {
+    throw new Error("반 정보를 확인하지 못했습니다.");
+  }
+  const session = await sessionOrNull();
+  if (!session || session.className !== targetClassName) {
+    showStudentLogin();
+    return;
+  }
+  await openStudentApp(session);
 }
 
 function itemLabel(item) {
@@ -330,13 +646,17 @@ async function selectedPhotosPayload(files) {
 }
 
 function showAssignment(assignment) {
+  const assignmentTitle = `${displayDateLabel(assignment.dateLabel)} 과제 클리어`;
+  const assignmentRange = assignment.rangeLabel || `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
   assignmentId = assignment.id;
   document.title = assignment.title;
   document.body.dataset.theme = assignment.theme || "focus";
-  classNameEl.textContent = assignment.className || "공통";
-  title.textContent = `${displayDateLabel(assignment.dateLabel)} 과제 클리어`;
-  rangeText.textContent = assignment.rangeLabel || `${assignment.book} ${assignment.problems[0]}번부터 ${assignment.problems.at(-1)}번까지`;
+  classNameEl.textContent = `${displayDateLabel(assignment.dateLabel)} 과제`;
+  title.textContent = assignmentTitle;
+  rangeText.textContent = assignmentRange;
   detail.textContent = "질문하고 싶은 문제들을 체크하고, 과제 사진은 첨부해 주세요.";
+  assignmentViewTitle.textContent = assignmentTitle;
+  assignmentViewRange.textContent = assignmentRange;
   renderProblems(assignment);
   noQuestionInput.checked = false;
   updateCount();
@@ -399,6 +719,7 @@ async function loadAssignment() {
     updatePasswordVisibility();
     renderPastAssignmentSelector(payload.assignments);
     showAssignment(payload.assignments[0]);
+    loadClassVideos(payload.assignments[0].className);
     return;
   }
 
@@ -408,6 +729,7 @@ async function loadAssignment() {
   passwordRequiredStudents = new Set(assignment.passwordRequiredStudents || []);
   updatePasswordVisibility();
   showAssignment(assignment);
+  loadClassVideos(assignment.className);
 }
 
 form.addEventListener("submit", async (event) => {
@@ -470,6 +792,8 @@ form.addEventListener("submit", async (event) => {
     renderSelectedPhotos(currentPhotoFiles, photoList);
     message.className = "message success";
     message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.</span>";
+    recordsLoadedForMonth = "";
+    await Promise.allSettled([loadStudentRecords(true), loadStudentHomeStatus()]);
   } catch (error) {
     revealPasswordForError(error);
     message.className = "message error";
@@ -548,7 +872,8 @@ async function submitPastAssignment() {
     renderSelectedPhotos(pastPhotoFiles, pastPhotoList);
     pastMessage.className = "message success";
     pastMessage.innerHTML = `<strong>지난과제 제출 완료되었습니다.</strong><span>${escapeHtml(selected?.dateLabel || "선택한 날짜")} 과제 제출로 기록되었습니다.</span>`;
-    await loadStudentMissingStatus();
+    recordsLoadedForMonth = "";
+    await Promise.allSettled([loadStudentMissingStatus(), loadStudentRecords(true), loadStudentHomeStatus()]);
   } finally {
     pastSubmitBtn.disabled = !pastAssignmentSelect.value;
   }
@@ -605,7 +930,79 @@ nameInput.addEventListener("input", () => {
   studentMissingResult.innerHTML = "";
 });
 
-loadAssignment().catch((error) => {
+function openAssignmentView(mode = "current") {
+  setStudentMainView("assignment");
+  setSubmissionMode(mode);
+  document.querySelector("#studentAssignmentView").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+homeStartAssignmentButton.addEventListener("click", () => openAssignmentView("current"));
+homeQuestionButton.addEventListener("click", () => openAssignmentView("current"));
+homePastAssignmentButton.addEventListener("click", () => openAssignmentView("past"));
+homeMissingAlert.addEventListener("click", () => {
+  if (homeMissingAlert.classList.contains("is-clear")) {
+    setStudentMainView("records");
+    return;
+  }
+  openAssignmentView("past");
+  loadStudentMissingStatus();
+});
+homeVideoAlert.addEventListener("click", () => setStudentMainView("videos"));
+homeViewButtons.forEach((button) => {
+  button.addEventListener("click", () => setStudentMainView(button.dataset.homeView));
+});
+
+studentMainTabs.forEach((button) => {
+  button.addEventListener("click", () => setStudentMainView(button.dataset.view));
+});
+
+studentRecordMonth.addEventListener("change", () => {
+  recordsLoadedForMonth = "";
+  loadStudentRecords(true).catch((error) => {
+    studentRecordsMessage.className = "message error";
+    studentRecordsMessage.textContent = error.message;
+  });
+});
+
+studentLoginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = studentLoginForm.querySelector('button[type="submit"]');
+  studentLoginMessage.className = "message";
+  studentLoginMessage.textContent = "로그인 중입니다.";
+  button.disabled = true;
+  try {
+    const session = await api("/api/student/login", {
+      method: "POST",
+      body: JSON.stringify({
+        className: targetClassName,
+        studentName: loginStudentName.value.trim(),
+        password: loginStudentPassword.value,
+      }),
+    });
+    loginStudentPassword.value = "";
+    await openStudentApp(session);
+  } catch (error) {
+    studentLoginMessage.className = "message error";
+    studentLoginMessage.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+studentLogoutButton.addEventListener("click", async () => {
+  studentLogoutButton.disabled = true;
+  try {
+    await api("/api/student/logout", { method: "POST", body: "{}" });
+  } finally {
+    location.reload();
+  }
+});
+
+bootstrapStudentApp().catch((error) => {
+  studentAuthLoading.hidden = false;
+  studentLoginGate.hidden = true;
+  studentApp.hidden = true;
+  studentAuthLoading.querySelector("strong").textContent = error.message;
   classNameEl.textContent = "확인 필요";
   title.textContent = "과제를 불러오지 못했습니다.";
   rangeText.textContent = "";

@@ -11,21 +11,157 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="과제 클리어체크" />
     <meta name="twitter:description" content="도와줘요 쌤 문제를 체크하고 과제 사진을 첨부해 주세요." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
-    <main class="shell student-shell">
-      <section class="student-hero">
-        <div class="student-class-pill" id="className">반 확인 중</div>
-        <img class="hero-character" src="/assets/teacher-character.png" alt="" />
-        <div class="hero-copy">
-          <p class="eyebrow">오늘의 미션</p>
-          <h1 id="title">과제 불러오는 중</h1>
-          <p id="rangeText" class="range-text"></p>
-          <p id="detail" class="muted"></p>
+  <body class="student-app-body">
+    <section id="studentAuthLoading" class="student-auth-loading">
+      <img src="/assets/teacher-character.png" alt="" />
+      <strong>학생 정보를 확인하고 있어요.</strong>
+    </section>
+
+    <section id="studentLoginGate" class="student-login-gate" hidden>
+      <div class="student-login-card">
+        <img src="/assets/teacher-character.png" alt="" />
+        <div>
+          <p class="eyebrow">황종선T 학생관리</p>
+          <h1>내 학습 기록 로그인</h1>
+          <p id="loginClassName" class="muted"></p>
         </div>
+        <form id="studentLoginForm">
+          <label>
+            이름
+            <input id="loginStudentName" autocomplete="username" placeholder="본인 이름을 정확히 입력해 주세요." required />
+          </label>
+          <label>
+            비밀번호
+            <input id="loginStudentPassword" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" placeholder="숫자 4자리" required />
+          </label>
+          <button class="primary full" type="submit">로그인</button>
+          <p class="muted login-help">한 번 로그인하면 이 기기에서는 계속 로그인 상태가 유지됩니다.</p>
+          <p id="studentLoginMessage" class="message"></p>
+        </form>
+      </div>
+    </section>
+
+    <main id="studentApp" class="student-shell student-dashboard-shell" hidden>
+      <header class="student-dashboard-header">
+        <div class="student-dashboard-brand">
+          <img src="/assets/teacher-character.png" alt="" />
+          <div>
+            <strong>황종선T 학생관리</strong>
+            <span id="loggedInClassName">반 확인 중</span>
+          </div>
+        </div>
+        <div class="student-dashboard-profile">
+          <strong id="loggedInStudentName"></strong>
+          <button id="studentLogoutButton" type="button">로그아웃</button>
+        </div>
+      </header>
+
+      <section id="studentHomeView" class="student-main-view student-home-view">
+        <section class="student-dashboard-welcome">
+          <span class="student-dashboard-today">TODAY</span>
+          <h1><span id="studentGreetingName"></span>아, 오늘도 하나씩 클리어!</h1>
+          <p>이번 과제까지 하면 이번 주 미션 완료야.</p>
+        </section>
+
+        <section class="student-dashboard-main">
+          <div class="student-dashboard-section-head">
+            <h2>내 학습 한눈에</h2>
+            <span id="studentDashboardMonth">이번 달 기록</span>
+          </div>
+          <div class="student-dashboard-stats">
+            <button class="student-dashboard-stat homework" type="button" data-home-view="records">
+              <span>과제 완료</span>
+              <strong id="homeHomeworkValue">확인 중</strong>
+            </button>
+            <button class="student-dashboard-stat attendance" type="button" data-home-view="records">
+              <span>이번 달 출석</span>
+              <strong id="homeAttendanceValue">확인 중</strong>
+            </button>
+            <button class="student-dashboard-stat tests" type="button" data-home-view="records">
+              <span>테스트 누적 평균</span>
+              <strong id="homeTestValue">확인 중</strong>
+            </button>
+            <button class="student-dashboard-stat videos" type="button" data-home-view="videos">
+              <span>수업영상</span>
+              <strong id="homeVideoValue">확인 중</strong>
+            </button>
+          </div>
+
+          <section class="student-dashboard-progress">
+            <div>
+              <strong>이번 달 과제 현황</strong>
+              <div class="student-dashboard-track"><span id="homeProgressBar"></span></div>
+            </div>
+            <b id="homeProgressValue">-</b>
+          </section>
+
+          <div class="student-dashboard-content">
+            <section>
+              <div class="student-dashboard-section-head compact">
+                <h2>지금 할 과제</h2>
+                <button id="homePastAssignmentButton" type="button">지난 과제</button>
+              </div>
+              <div class="student-dashboard-assignment">
+                <div class="student-dashboard-assignment-top">
+                  <div>
+                    <span id="className" class="student-dashboard-assignment-label">이번 과제</span>
+                    <h3 id="title" class="student-dashboard-assignment-title">과제 불러오는 중</h3>
+                    <p id="rangeText" class="student-dashboard-assignment-range"></p>
+                  </div>
+                  <span id="homeAssignmentStatus" class="student-dashboard-due">확인 중</span>
+                </div>
+                <p id="detail" class="student-dashboard-detail"></p>
+                <div class="student-dashboard-actions">
+                  <button id="homeStartAssignmentButton" type="button">과제 시작</button>
+                  <button id="homeQuestionButton" type="button">질문 번호 보기</button>
+                </div>
+              </div>
+            </section>
+            <aside>
+              <div class="student-dashboard-section-head compact">
+                <h2>최근 확인</h2>
+              </div>
+              <button id="homeMissingAlert" class="student-dashboard-alert missing" type="button">
+                <strong>미제출 과제를 확인하고 있어요</strong>
+                <span>잠시만 기다려 주세요.</span>
+              </button>
+              <button id="homeVideoAlert" class="student-dashboard-alert video" type="button">
+                <strong>수업 영상을 확인하고 있어요</strong>
+                <span>새 영상이 있으면 여기에 표시됩니다.</span>
+              </button>
+            </aside>
+          </div>
+        </section>
       </section>
 
+      <section id="studentVideoView" class="student-main-view" hidden>
+        <section id="classVideos" class="class-videos" hidden aria-labelledby="classVideosTitle">
+          <div class="class-videos-head">
+            <div>
+              <p class="eyebrow">다시 보는 수업</p>
+              <h2 id="classVideosTitle">수업 영상</h2>
+            </div>
+            <a id="classVideosPlaylist" class="ghost" href="https://www.youtube.com/playlist?list=PLAljtV9lQmNQ" target="_blank" rel="noopener noreferrer">전체 보기</a>
+          </div>
+          <div id="classVideoList" class="class-video-list"></div>
+        </section>
+        <section id="videoEmptyState" class="panel student-empty-state" hidden>
+          <strong>등록된 수업 영상이 아직 없어요.</strong>
+          <span class="muted">새 영상이 등록되면 이곳에 나타납니다.</span>
+        </section>
+      </section>
+
+      <section id="studentAssignmentView" class="student-main-view" hidden>
+      <section class="student-assignment-context">
+        <span>이번 과제</span>
+        <h2 id="assignmentViewTitle">과제 불러오는 중</h2>
+        <p id="assignmentViewRange"></p>
+      </section>
       <section class="panel">
         <form id="responseForm">
           <label>
@@ -132,6 +268,41 @@
           </section>
         </form>
       </section>
+      </section>
+
+      <section id="studentRecordsView" class="student-main-view" hidden>
+        <section class="panel student-records-panel">
+          <div class="student-records-head">
+            <div>
+              <p class="eyebrow">나의 학습 흐름</p>
+              <h2>내 기록</h2>
+            </div>
+            <label>
+              확인할 달
+              <input id="studentRecordMonth" type="month" />
+            </label>
+          </div>
+          <div id="studentRecordSummary" class="student-record-summary"></div>
+          <div class="student-record-columns">
+            <section>
+              <h3>출결 기록</h3>
+              <div id="studentAttendanceHistory" class="student-history-list"></div>
+            </section>
+            <section>
+              <h3>테스트 누적 기록</h3>
+              <div id="studentTestHistory" class="student-history-list"></div>
+            </section>
+          </div>
+          <p id="studentRecordsMessage" class="message"></p>
+        </section>
+      </section>
+
+      <nav class="student-main-tabs" aria-label="학생관리 메뉴">
+        <button class="student-main-tab is-active" type="button" data-view="home" aria-selected="true">홈</button>
+        <button class="student-main-tab" type="button" data-view="assignment" aria-selected="false">과제</button>
+        <button class="student-main-tab" type="button" data-view="videos" aria-selected="false">수업영상</button>
+        <button class="student-main-tab" type="button" data-view="records" aria-selected="false">내 기록</button>
+      </nav>
     </main>
 
     <script src="/student.js"></script>
