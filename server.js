@@ -20,6 +20,37 @@ const CLASS_WEEKDAYS = {
 };
 const ATTENDANCE_STATUSES = new Set(["present", "late", "absent", "early", "makeup"]);
 let youtubeCache = { expiresAt: 0, videos: [] };
+const MANUAL_YOUTUBE_VIDEOS = [
+  {
+    id: "-uHifP-KULc",
+    title: "고1 SKY 8/19수업",
+    publishedAt: "2026-08-19T00:00:00+09:00",
+  },
+  {
+    id: "bgiaupsoPNc",
+    title: "고1 제니트 8/18 수업",
+    publishedAt: "2026-08-18T00:00:00+09:00",
+  },
+  {
+    id: "7JdNsaZ0cc8",
+    title: "고1 SKY 8/12 수업",
+    publishedAt: "2026-08-12T00:00:00+09:00",
+  },
+  {
+    id: "x89UvLsSRnk",
+    title: "고1 제니트 8/11수업",
+    publishedAt: "2026-08-11T00:00:00+09:00",
+  },
+  {
+    id: "G8TjeymrFEo",
+    title: "고1 1티어 8/3 수업",
+    publishedAt: "2026-08-03T00:00:00+09:00",
+  },
+].map((video) => ({
+  ...video,
+  thumbnail: `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
+  url: `https://www.youtube.com/watch?v=${video.id}`,
+}));
 const store = createStore({
   localFile: path.join(ROOT, "data.json"),
   sheetsUrl: process.env.SHEETS_WEB_APP_URL,
@@ -143,9 +174,20 @@ function videoMatchesClass(title, className) {
   return false;
 }
 
+function uniqueVideos(videos) {
+  const byId = new Map();
+  for (const video of videos) {
+    if (video?.id) {
+      byId.set(video.id, video);
+    }
+  }
+  return [...byId.values()].sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
+}
+
 async function youtubePlaylistVideos() {
   if (!YOUTUBE_API_KEY) {
-    return { configured: false, videos: [] };
+    const videos = uniqueVideos(MANUAL_YOUTUBE_VIDEOS);
+    return { configured: videos.length > 0, videos };
   }
   if (youtubeCache.expiresAt > Date.now()) {
     return { configured: true, videos: youtubeCache.videos };
@@ -189,9 +231,9 @@ async function youtubePlaylistVideos() {
     pageToken = payload.nextPageToken || "";
   } while (pageToken && videos.length < 200);
 
-  videos.sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
-  youtubeCache = { expiresAt: Date.now() + YOUTUBE_CACHE_MS, videos };
-  return { configured: true, videos };
+  const mergedVideos = uniqueVideos([...MANUAL_YOUTUBE_VIDEOS, ...videos]);
+  youtubeCache = { expiresAt: Date.now() + YOUTUBE_CACHE_MS, videos: mergedVideos };
+  return { configured: true, videos: mergedVideos };
 }
 
 function passwordRecord(password) {
