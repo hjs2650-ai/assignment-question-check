@@ -34,6 +34,7 @@
           <label>
             이름
             <input id="loginStudentName" autocomplete="username" placeholder="본인 이름을 정확히 입력해 주세요." required />
+            <span id="loginSchoolName" class="login-school-name" hidden></span>
           </label>
           <label>
             비밀번호
@@ -56,7 +57,10 @@
           </div>
         </div>
         <div class="student-dashboard-profile">
-          <strong id="loggedInStudentName"></strong>
+          <div>
+            <strong id="loggedInStudentName"></strong>
+            <span id="loggedInSchoolName" hidden></span>
+          </div>
           <button id="studentLogoutButton" type="button">로그아웃</button>
         </div>
       </header>

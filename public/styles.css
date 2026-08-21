@@ -1268,6 +1268,42 @@ summary {
   text-align: center;
 }
 
+.login-school-name {
+  display: block;
+  width: fit-content;
+  margin-top: 8px;
+  border: 1px solid #e3b9af;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #fff1ed;
+  color: #a45142;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.login-school-name[hidden] {
+  display: none;
+}
+
+.student-dashboard-profile > div {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.student-dashboard-profile > div > span {
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #fff0eb;
+  color: #a45142;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-dashboard-profile > div > span[hidden] {
+  display: none;
+}
+
 .student-account-bar {
   display: flex;
   align-items: center;
@@ -2313,12 +2349,25 @@ body[data-theme="night"] .range-text {
   text-align: right;
 }
 
+.student-dashboard-profile > div {
+  justify-items: end;
+}
+
 .student-dashboard-profile strong {
   overflow: hidden;
   color: #4e474a;
   font-size: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.student-dashboard-profile #loggedInSchoolName {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--student-coral-soft);
+  color: var(--student-coral-dark);
+  font-size: 12px;
 }
 
 .student-dashboard-profile #studentLogoutButton {

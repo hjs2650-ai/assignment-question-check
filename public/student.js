@@ -43,10 +43,12 @@ const studentLoginGate = document.querySelector("#studentLoginGate");
 const studentLoginForm = document.querySelector("#studentLoginForm");
 const loginClassName = document.querySelector("#loginClassName");
 const loginStudentName = document.querySelector("#loginStudentName");
+const loginSchoolName = document.querySelector("#loginSchoolName");
 const loginStudentPassword = document.querySelector("#loginStudentPassword");
 const studentLoginMessage = document.querySelector("#studentLoginMessage");
 const studentApp = document.querySelector("#studentApp");
 const loggedInStudentName = document.querySelector("#loggedInStudentName");
+const loggedInSchoolName = document.querySelector("#loggedInSchoolName");
 const loggedInClassName = document.querySelector("#loggedInClassName");
 const studentLogoutButton = document.querySelector("#studentLogoutButton");
 const studentMainTabs = [...document.querySelectorAll(".student-main-tab")];
@@ -86,6 +88,7 @@ let passwordRequiredStudents = new Set();
 let activeStudentSession = null;
 let targetClassName = routeType === "class" ? routeValue : "";
 let recordsLoadedForMonth = "";
+let schoolLookupTimer = 0;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -380,6 +383,28 @@ function showStudentLogin() {
   loginStudentName.focus();
 }
 
+async function updateLoginSchoolName() {
+  const studentName = loginStudentName.value.trim();
+  loginSchoolName.hidden = true;
+  loginSchoolName.textContent = "";
+  if (!studentName || !targetClassName) {
+    return;
+  }
+  try {
+    const payload = await api("/api/student/school", {
+      method: "POST",
+      body: JSON.stringify({ className: targetClassName, studentName }),
+    });
+    if (studentName !== loginStudentName.value.trim() || !payload.schoolName) {
+      return;
+    }
+    loginSchoolName.textContent = payload.schoolName;
+    loginSchoolName.hidden = false;
+  } catch {
+    loginSchoolName.hidden = true;
+  }
+}
+
 async function openStudentApp(session) {
   activeStudentSession = session;
   nameInput.value = session.studentName;
@@ -387,6 +412,8 @@ async function openStudentApp(session) {
   nameInput.setAttribute("aria-readonly", "true");
   updatePasswordVisibility();
   loggedInStudentName.textContent = session.studentName;
+  loggedInSchoolName.textContent = session.schoolName || "";
+  loggedInSchoolName.hidden = !session.schoolName;
   loggedInClassName.textContent = session.className;
   studentGreetingName.textContent = session.studentName.length === 3
     ? session.studentName.slice(1)
@@ -398,6 +425,14 @@ async function openStudentApp(session) {
   await loadAssignment();
   await Promise.allSettled([loadStudentRecords(true), loadStudentHomeStatus()]);
 }
+
+loginStudentName.addEventListener("input", () => {
+  window.clearTimeout(schoolLookupTimer);
+  loginSchoolName.hidden = true;
+  schoolLookupTimer = window.setTimeout(updateLoginSchoolName, 250);
+});
+
+loginStudentName.addEventListener("blur", updateLoginSchoolName);
 
 async function bootstrapStudentApp() {
   studentRecordMonth.value = localMonthValue();

@@ -22,6 +22,40 @@ const CLASS_WEEKDAYS = {
   "고1 제니트Z2": [2, 4],
   "고1 SKYA3": [3, 6],
 };
+const STUDENT_SCHOOLS = {
+  "고1 1티어D3": {
+    권태희: "다산고",
+    김은찬: "다산고",
+    박상현: "다산고",
+    오수범: "다산고",
+    황동민: "다산고",
+    김태건: "다산고",
+  },
+  "고1 제니트Z2": {
+    김가을: "청원여고",
+    김예한: "동화고",
+    남현수: "갈매고",
+    이승현: "도농고",
+    이유찬: "동화고",
+    이찬민: "삼육고",
+    임보민: "다산고",
+    장지원: "동화고",
+    전소담: "다산고",
+    최재민: "동화고",
+    홍석준: "다산고",
+    정승후: "동화고",
+    조수민: "동화고",
+    나율하: "다산고",
+  },
+  "고1 SKYA3": {
+    김주원: "도농고",
+    박시아: "다산고",
+    이가윤: "다산고",
+    조재현: "동화고",
+    주태환: "다산고",
+    김유진: "퇴계원고",
+  },
+};
 const ATTENDANCE_STATUSES = new Set(["present", "late", "absent", "early", "makeup"]);
 let youtubeCache = { expiresAt: 0, videos: [] };
 let youtubeUploadsPlaylistId = "";
@@ -536,6 +570,14 @@ function classInfoFor(data, className) {
   return data.classes.find((item) => normalizeClassName(item.name) === targetClass);
 }
 
+function studentSchoolFor(data, className, studentName) {
+  const targetClass = normalizeClassName(className);
+  const targetStudent = normalizeText(studentName);
+  const classInfo = classInfoFor(data, targetClass);
+  const savedSchool = classInfo?.studentSchools?.[targetStudent];
+  return normalizeText(savedSchool || STUDENT_SCHOOLS[targetClass]?.[targetStudent]);
+}
+
 function studentPasswordRecord(data, className, studentName) {
   const classInfo = classInfoFor(data, className);
   return classInfo && classInfo.studentPasswords ? classInfo.studentPasswords[studentName] : null;
@@ -874,9 +916,27 @@ async function handleApi(req, res, pathname) {
     sendJson(
       res,
       200,
-      { className, studentName, expiresAt: Date.now() + SESSION_TTL_SECONDS * 1000 },
+      {
+        className,
+        studentName,
+        schoolName: studentSchoolFor(data, className, studentName),
+        expiresAt: Date.now() + SESSION_TTL_SECONDS * 1000,
+      },
       { "Set-Cookie": sessionCookie(req, token) },
     );
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/student/school") {
+    const body = await readBody(req);
+    const className = normalizeClassName(body.className);
+    const studentName = normalizeText(body.studentName);
+    const classInfo = classInfoFor(data, className);
+    if (!classInfo || !classInfo.students.includes(studentName)) {
+      sendJson(res, 404, { error: "학생 정보를 확인하지 못했습니다." });
+      return;
+    }
+    sendJson(res, 200, { schoolName: studentSchoolFor(data, className, studentName) });
     return;
   }
 
@@ -891,7 +951,10 @@ async function handleApi(req, res, pathname) {
       sendJson(res, 401, { error: "로그인이 필요합니다." });
       return;
     }
-    sendJson(res, 200, session);
+    sendJson(res, 200, {
+      ...session,
+      schoolName: studentSchoolFor(data, session.className, session.studentName),
+    });
     return;
   }
 
