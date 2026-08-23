@@ -1362,7 +1362,7 @@ summary {
 
 .student-record-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -1386,6 +1386,11 @@ summary {
   background: #fff9e9;
 }
 
+.student-record-summary > div:nth-child(4) {
+  border-left-color: #d78572;
+  background: #fff4f1;
+}
+
 .student-record-summary span,
 .student-record-summary small {
   color: var(--muted);
@@ -1397,7 +1402,7 @@ summary {
 
 .student-record-columns {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 26px;
 }
 
@@ -1686,7 +1691,7 @@ summary {
 
 .test-create-form {
   display: grid;
-  grid-template-columns: 150px minmax(210px, 1fr) 90px minmax(230px, 1fr) auto;
+  grid-template-columns: 145px 130px minmax(190px, 1fr) 85px minmax(210px, 1fr) auto;
   align-items: end;
   gap: 12px;
   border-bottom: 1px solid var(--line);
@@ -1745,10 +1750,16 @@ summary {
   margin-bottom: 14px;
 }
 
-.selected-test-topics-field {
+.selected-test-meta-fields {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.selected-test-meta-fields label {
   display: grid;
   gap: 6px;
-  margin: 14px 0;
 }
 
 .test-score-row {
@@ -1782,7 +1793,7 @@ summary {
 .test-cumulative-row,
 .monthly-student-row {
   display: grid;
-  grid-template-columns: minmax(110px, 1.3fr) repeat(3, minmax(72px, 0.7fr));
+  grid-template-columns: minmax(110px, 1.3fr) repeat(4, minmax(72px, 0.7fr));
   align-items: center;
   gap: 10px;
   min-height: 48px;
@@ -1838,7 +1849,7 @@ summary {
 
 .monthly-report-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin: 22px 0;
 }
@@ -1854,6 +1865,7 @@ summary {
 .monthly-report-metrics > div:nth-child(2) { border-left-color: #0f8f7a; }
 .monthly-report-metrics > div:nth-child(3) { border-left-color: #e7a100; }
 .monthly-report-metrics > div:nth-child(4) { border-left-color: #c2413a; }
+.monthly-report-metrics > div:nth-child(5) { border-left-color: #9a72b8; }
 
 .monthly-report-metrics span,
 .monthly-report-metrics small {
@@ -2289,7 +2301,8 @@ body[data-theme="night"] .range-text {
 
   .attendance-student-list,
   .test-workspace,
-  .test-create-form {
+  .test-create-form,
+  .selected-test-meta-fields {
     grid-template-columns: 1fr;
   }
 
@@ -2923,6 +2936,11 @@ body[data-theme="night"] .range-text {
 .student-app-body .student-record-summary > div:nth-child(3) {
   border-left-color: #82aee0;
   background: var(--student-blue-soft);
+}
+
+.student-app-body .student-record-summary > div:nth-child(4) {
+  border-left-color: #d78572;
+  background: var(--student-coral-soft);
 }
 
 .student-main-tabs {

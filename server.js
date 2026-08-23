@@ -538,6 +538,7 @@ function normalizeData(data) {
       className: normalizeClassName(test.className),
       date: normalizeText(test.date),
       name: normalizeText(test.name),
+      kind: test.kind === "relearning" || /재학습/.test(normalizeText(test.name)) ? "relearning" : "test",
       maxScore: Number(test.maxScore),
       topics: normalizeLabelList(test.topics),
       scores: test.scores && typeof test.scores === "object" ? test.scores : {},
@@ -758,6 +759,7 @@ function publicTest(test, students = []) {
     className: test.className,
     date: test.date,
     name: test.name,
+    kind: test.kind === "relearning" ? "relearning" : "test",
     maxScore: test.maxScore,
     topics: normalizeLabelList(test.topics),
     scores: Object.fromEntries(students.map((student) => [student, normalizedScore(test.scores[student])])),
@@ -769,7 +771,12 @@ function publicTest(test, students = []) {
 function testSummaryForStudent(data, className, studentName, month = "") {
   const targetClass = normalizeClassName(className);
   const tests = data.tests
-    .filter((test) => test.className === targetClass && (!month || test.date.startsWith(`${month}-`)))
+    .filter(
+      (test) =>
+        test.className === targetClass &&
+        test.kind !== "relearning" &&
+        (!month || test.date.startsWith(`${month}-`)),
+    )
     .map((test) => ({ test, result: normalizedScore(test.scores[studentName]) }))
     .filter(({ result }) => result.score !== null || result.absent)
     .sort((a, b) => b.test.date.localeCompare(a.test.date));
@@ -783,6 +790,7 @@ function testSummaryForStudent(data, className, studentName, month = "") {
       id: test.id,
       date: test.date,
       name: test.name,
+      kind: "test",
       maxScore: test.maxScore,
       topics: normalizeLabelList(test.topics),
       ...result,
@@ -791,11 +799,48 @@ function testSummaryForStudent(data, className, studentName, month = "") {
   };
 }
 
+function relearningSummaryForStudent(data, className, studentName, month = "") {
+  const targetClass = normalizeClassName(className);
+  const rows = data.tests
+    .filter(
+      (test) =>
+        test.className === targetClass &&
+        test.kind === "relearning" &&
+        (!month || test.date.startsWith(`${month}-`)),
+    )
+    .map((test) => ({ test, result: normalizedScore(test.scores[studentName]) }))
+    .filter(({ result }) => result.score !== null || result.absent)
+    .sort((a, b) => b.test.date.localeCompare(a.test.date));
+  const completed = rows.filter(({ result }) => result.score !== null).length;
+  const completedRows = rows.filter(({ result }) => result.score !== null);
+  return {
+    count: rows.length,
+    completed,
+    rate: rows.length ? Math.round((completed / rows.length) * 100) : null,
+    score: completedRows.reduce((sum, { result }) => sum + result.score, 0),
+    maxScore: completedRows.reduce((sum, { test }) => sum + test.maxScore, 0),
+    rows: rows.map(({ test, result }) => ({
+      id: test.id,
+      date: test.date,
+      name: test.name,
+      maxScore: test.maxScore,
+      topics: normalizeLabelList(test.topics),
+      ...result,
+      completed: result.score !== null,
+    })),
+  };
+}
+
 function topicAnalysisForStudent(data, className, studentName, month) {
   const targetClass = normalizeClassName(className);
   const topicRows = new Map();
   data.tests
-    .filter((test) => test.className === targetClass && test.date.startsWith(`${month}-`))
+    .filter(
+      (test) =>
+        test.className === targetClass &&
+        test.kind !== "relearning" &&
+        test.date.startsWith(`${month}-`),
+    )
     .forEach((test) => {
       const result = normalizedScore(test.scores[studentName]);
       if (result.score === null) {
@@ -862,6 +907,7 @@ function monthlySummary(data, className, month) {
     homework: homeworkSummaryForStudent(data, targetClass, studentName, monthValue),
     attendance: attendanceSummaryForStudent(data, targetClass, studentName, monthValue),
     tests: testSummaryForStudent(data, targetClass, studentName, monthValue),
+    relearning: relearningSummaryForStudent(data, targetClass, studentName, monthValue),
     learning: topicAnalysisForStudent(data, targetClass, studentName, monthValue),
   }));
 }
@@ -1036,6 +1082,7 @@ async function handleApi(req, res, pathname) {
       studentName: session.studentName,
       ...monthly,
       cumulativeTests: testSummaryForStudent(data, session.className, session.studentName),
+      cumulativeRelearning: relearningSummaryForStudent(data, session.className, session.studentName),
     });
     return;
   }
@@ -1140,6 +1187,7 @@ async function handleApi(req, res, pathname) {
         className: classInfo.name,
         date,
         name,
+        kind: body.kind === "relearning" ? "relearning" : "test",
         maxScore,
         topics: normalizeLabelList(body.topics),
         scores: {},
@@ -1169,6 +1217,9 @@ async function handleApi(req, res, pathname) {
       }
       if (body.name !== undefined && normalizeText(body.name)) {
         test.name = normalizeText(body.name);
+      }
+      if (body.kind === "test" || body.kind === "relearning") {
+        test.kind = body.kind;
       }
       if (body.maxScore !== undefined && Number(body.maxScore) > 0) {
         test.maxScore = Number(body.maxScore);

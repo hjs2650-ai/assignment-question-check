@@ -174,6 +174,13 @@
             <input name="date" type="date" required />
           </label>
           <label>
+            종류
+            <select name="kind">
+              <option value="test">일반 테스트</option>
+              <option value="relearning">보완학습</option>
+            </select>
+          </label>
+          <label>
             테스트명
             <input name="name" placeholder="예: 집합과 명제 일일테스트" required />
           </label>
@@ -200,17 +207,26 @@
               </div>
               <button id="deleteTestButton" class="ghost danger" type="button">삭제</button>
             </div>
-            <label class="selected-test-topics-field">
-              출제 단원
-              <input id="selectedTestTopics" placeholder="쉼표로 여러 단원을 구분해 주세요." />
-            </label>
+            <div class="selected-test-meta-fields">
+              <label>
+                종류
+                <select id="selectedTestKind">
+                  <option value="test">일반 테스트</option>
+                  <option value="relearning">보완학습</option>
+                </select>
+              </label>
+              <label>
+                출제 단원
+                <input id="selectedTestTopics" placeholder="쉼표로 여러 단원을 구분해 주세요." />
+              </label>
+            </div>
             <div id="testScoreRows" class="test-score-rows"></div>
             <button id="saveTestScoresButton" class="primary" type="button">점수 저장</button>
             <p id="testMessage" class="message"></p>
           </section>
         </div>
         <section class="test-cumulative-section">
-          <h3>학생별 누적 성적</h3>
+          <h3>학생별 테스트 · 보완학습 현황</h3>
           <div id="testCumulativeTable" class="test-cumulative-table"></div>
         </section>
       </section>

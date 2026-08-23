@@ -38,6 +38,7 @@ const teacherTestList = document.querySelector("#teacherTestList");
 const testScoreEditor = document.querySelector("#testScoreEditor");
 const selectedTestDate = document.querySelector("#selectedTestDate");
 const selectedTestTitle = document.querySelector("#selectedTestTitle");
+const selectedTestKind = document.querySelector("#selectedTestKind");
 const selectedTestTopics = document.querySelector("#selectedTestTopics");
 const testScoreRows = document.querySelector("#testScoreRows");
 const saveTestScoresButton = document.querySelector("#saveTestScoresButton");
@@ -453,12 +454,20 @@ function selectedTest() {
 function renderTestCumulative() {
   testCumulativeTable.innerHTML = testStudents.length
     ? `
-      <div class="test-cumulative-row is-head"><span>학생</span><span>응시</span><span>평균</span><span>최근</span></div>
+      <div class="test-cumulative-row is-head"><span>학생</span><span>테스트</span><span>평균</span><span>최근</span><span>보완학습</span></div>
       ${testStudents
         .map((student) => {
           const results = teacherTests
+            .filter((test) => test.kind !== "relearning")
             .map((test) => ({ test, result: test.scores?.[student] }))
             .filter(({ result }) => result && result.score !== null && result.score !== undefined);
+          const relearning = teacherTests
+            .filter((test) => test.kind === "relearning")
+            .map((test) => ({ test, result: test.scores?.[student] }))
+            .filter(({ result }) => result && (result.score !== null && result.score !== undefined || result.absent));
+          const relearningCompleted = relearning.filter(
+            ({ result }) => result.score !== null && result.score !== undefined,
+          ).length;
           const percentages = results.map(({ test, result }) => (Number(result.score) / test.maxScore) * 100);
           const average = percentages.length
             ? Math.round((percentages.reduce((sum, value) => sum + value, 0) / percentages.length) * 10) / 10
@@ -470,6 +479,7 @@ function renderTestCumulative() {
               <span>${results.length}회</span>
               <span>${percentText(average)}</span>
               <span>${latest ? `${escapeHtml(latest.result.score)}/${escapeHtml(latest.test.maxScore)}` : "-"}</span>
+              <span>${relearningCompleted}/${relearning.length}회</span>
             </div>
           `;
         })
@@ -487,6 +497,7 @@ function renderTestEditor() {
   testScoreEditor.hidden = false;
   selectedTestDate.textContent = `${displayIsoDate(test.date)} · ${test.maxScore}점 만점`;
   selectedTestTitle.textContent = test.name;
+  selectedTestKind.value = test.kind === "relearning" ? "relearning" : "test";
   selectedTestTopics.value = (test.topics || []).join(", ");
   testScoreRows.innerHTML = testStudents
     .map((student) => {
@@ -528,7 +539,7 @@ function renderTests() {
           (test) => `
             <button class="teacher-test-item ${test.id === selectedTestId ? "is-active" : ""}" type="button" data-id="${test.id}">
               <strong>${escapeHtml(test.name)}</strong>
-              <span>${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점</span>
+              <span>${test.kind === "relearning" ? "보완학습" : "일반 테스트"} · ${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점</span>
               ${(test.topics || []).length ? `<small>${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
             </button>
           `,
@@ -583,7 +594,7 @@ async function saveTestScores() {
   try {
     await api(`/api/tests/${encodeURIComponent(test.id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ scores, topics: selectedTestTopics.value }),
+      body: JSON.stringify({ scores, topics: selectedTestTopics.value, kind: selectedTestKind.value }),
     });
     testMessage.className = "message success";
     testMessage.textContent = "점수를 저장했습니다.";
@@ -603,6 +614,9 @@ function monthlyNarrative(row) {
   }
   if (row.tests.count) {
     parts.push(`이번 달 테스트 평균은 ${row.tests.averagePercent}%입니다.`);
+  }
+  if (row.relearning?.completed) {
+    parts.push(`보완학습은 ${row.relearning.count}회 중 ${row.relearning.completed}회 완료했습니다.`);
   }
   if (row.learning?.strong?.length) {
     parts.push(`${row.learning.strong.map((item) => item.topic).join(", ")} 단원은 비교적 잘 이해하고 있습니다.`);
@@ -665,6 +679,7 @@ function showMonthlyPreview(studentName) {
         <div><span>과제 제출률</span><strong>${percentText(row.homework.rate)}</strong><small>${row.homework.submitted}/${row.homework.total}회</small></div>
         <div><span>출석률</span><strong>${percentText(row.attendance.rate)}</strong><small>결석 ${row.attendance.counts.absent}회 · 지각 ${row.attendance.counts.late}회</small></div>
         <div><span>테스트 평균</span><strong>${percentText(row.tests.averagePercent)}</strong><small>${row.tests.count}회 응시</small></div>
+        <div><span>보완학습</span><strong>${row.relearning.completed}/${row.relearning.count}회</strong><small>정답 ${row.relearning.score}/${row.relearning.maxScore}문항</small></div>
         <div><span>질문 문항</span><strong>${row.homework.questionCount}개</strong><small>이번 달 체크</small></div>
       </div>
       ${monthlyLearningHtml(row.learning)}

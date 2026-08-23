@@ -78,6 +78,7 @@ const studentRecordSummary = document.querySelector("#studentRecordSummary");
 const studentLearningAnalysis = document.querySelector("#studentLearningAnalysis");
 const studentAttendanceHistory = document.querySelector("#studentAttendanceHistory");
 const studentTestHistory = document.querySelector("#studentTestHistory");
+const studentRelearningHistory = document.querySelector("#studentRelearningHistory");
 const studentRecordsMessage = document.querySelector("#studentRecordsMessage");
 
 let assignmentId = routeType === "student" ? routeValue : "";
@@ -289,6 +290,7 @@ function renderStudentRecords(payload) {
   const homework = payload.homework || {};
   const attendance = payload.attendance || { counts: {}, rows: [] };
   const cumulativeTests = payload.cumulativeTests || { tests: [] };
+  const cumulativeRelearning = payload.cumulativeRelearning || { rows: [] };
   studentRecordSummary.innerHTML = `
     <div>
       <span>과제 제출률</span>
@@ -304,6 +306,11 @@ function renderStudentRecords(payload) {
       <span>누적 테스트 평균</span>
       <strong>${percentText(cumulativeTests.averagePercent)}</strong>
       <small>${cumulativeTests.count || 0}회 응시</small>
+    </div>
+    <div>
+      <span>보완학습</span>
+      <strong>${cumulativeRelearning.completed || 0}회</strong>
+      <small>${cumulativeRelearning.count || 0}회 중 완료</small>
     </div>
   `;
 
@@ -371,6 +378,24 @@ function renderStudentRecords(payload) {
         )
         .join("")
     : `<p class="muted">등록된 테스트 결과가 아직 없습니다.</p>`;
+
+  studentRelearningHistory.innerHTML = cumulativeRelearning.rows?.length
+    ? cumulativeRelearning.rows
+        .map(
+          (row) => `
+            <div class="student-history-row test-history-row relearning-history-row">
+              <div>
+                <strong>${escapeHtml(row.name)}</strong>
+                <small>${escapeHtml(displayIsoDate(row.date))}</small>
+                ${(row.topics || []).length ? `<small class="test-topic-list">${row.topics.map(escapeHtml).join(" · ")}</small>` : ""}
+              </div>
+              <span>${row.completed ? `${escapeHtml(row.score)} / ${escapeHtml(row.maxScore)}` : "미완료"}</span>
+              <em>${row.completed ? "완료" : "-"}</em>
+            </div>
+          `,
+        )
+        .join("")
+    : `<p class="muted">등록된 보완학습 기록이 아직 없습니다.</p>`;
 
   renderStudentHomeSummary(payload);
 }
