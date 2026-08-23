@@ -181,6 +181,10 @@
             만점
             <input name="maxScore" type="number" min="1" value="100" required />
           </label>
+          <label>
+            출제 단원
+            <input name="topics" placeholder="예: 평면좌표, 직선의 방정식" />
+          </label>
           <button class="primary" type="submit">테스트 만들기</button>
         </form>
         <div class="test-workspace">
@@ -196,6 +200,10 @@
               </div>
               <button id="deleteTestButton" class="ghost danger" type="button">삭제</button>
             </div>
+            <label class="selected-test-topics-field">
+              출제 단원
+              <input id="selectedTestTopics" placeholder="쉼표로 여러 단원을 구분해 주세요." />
+            </label>
             <div id="testScoreRows" class="test-score-rows"></div>
             <button id="saveTestScoresButton" class="primary" type="button">점수 저장</button>
             <p id="testMessage" class="message"></p>

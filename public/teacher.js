@@ -38,6 +38,7 @@ const teacherTestList = document.querySelector("#teacherTestList");
 const testScoreEditor = document.querySelector("#testScoreEditor");
 const selectedTestDate = document.querySelector("#selectedTestDate");
 const selectedTestTitle = document.querySelector("#selectedTestTitle");
+const selectedTestTopics = document.querySelector("#selectedTestTopics");
 const testScoreRows = document.querySelector("#testScoreRows");
 const saveTestScoresButton = document.querySelector("#saveTestScoresButton");
 const deleteTestButton = document.querySelector("#deleteTestButton");
@@ -486,6 +487,7 @@ function renderTestEditor() {
   testScoreEditor.hidden = false;
   selectedTestDate.textContent = `${displayIsoDate(test.date)} · ${test.maxScore}점 만점`;
   selectedTestTitle.textContent = test.name;
+  selectedTestTopics.value = (test.topics || []).join(", ");
   testScoreRows.innerHTML = testStudents
     .map((student) => {
       const result = test.scores?.[student] || { score: null, absent: false, note: "" };
@@ -527,6 +529,7 @@ function renderTests() {
             <button class="teacher-test-item ${test.id === selectedTestId ? "is-active" : ""}" type="button" data-id="${test.id}">
               <strong>${escapeHtml(test.name)}</strong>
               <span>${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점</span>
+              ${(test.topics || []).length ? `<small>${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
             </button>
           `,
         )
@@ -580,7 +583,7 @@ async function saveTestScores() {
   try {
     await api(`/api/tests/${encodeURIComponent(test.id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ scores }),
+      body: JSON.stringify({ scores, topics: selectedTestTopics.value }),
     });
     testMessage.className = "message success";
     testMessage.textContent = "점수를 저장했습니다.";
@@ -601,7 +604,48 @@ function monthlyNarrative(row) {
   if (row.tests.count) {
     parts.push(`이번 달 테스트 평균은 ${row.tests.averagePercent}%입니다.`);
   }
+  if (row.learning?.strong?.length) {
+    parts.push(`${row.learning.strong.map((item) => item.topic).join(", ")} 단원은 비교적 잘 이해하고 있습니다.`);
+  }
+  if (row.learning?.weak?.length) {
+    parts.push(`${row.learning.weak.map((item) => item.topic).join(", ")} 단원은 다시 확인하며 보완하겠습니다.`);
+  }
   return parts.length ? parts.join(" ") : "이번 달 기록이 쌓이면 학습 흐름을 자세히 안내할 수 있습니다.";
+}
+
+function monthlyLearningHtml(learning = {}) {
+  const strong = learning.strong || [];
+  const weak = learning.weak || [];
+  const weakTypes = learning.weakTypes || [];
+  if (!strong.length && !weak.length && !weakTypes.length) {
+    return "";
+  }
+  const rows = [];
+  if (strong.length) {
+    rows.push(`
+      <div>
+        <span>잘한 단원</span>
+        <p>${strong.map((item) => `<strong>${escapeHtml(item.topic)}</strong><small>${escapeHtml(item.percent)}%</small>`).join("")}</p>
+      </div>
+    `);
+  }
+  if (weak.length) {
+    rows.push(`
+      <div>
+        <span>더 연습할 단원</span>
+        <p>${weak.map((item) => `<strong>${escapeHtml(item.topic)}</strong><small>${escapeHtml(item.percent)}%</small>`).join("")}</p>
+      </div>
+    `);
+  }
+  if (weakTypes.length) {
+    rows.push(`
+      <div>
+        <span>취약 유형</span>
+        <p>${weakTypes.map((item) => `<strong>${escapeHtml(item)}</strong>`).join("")}</p>
+      </div>
+    `);
+  }
+  return `<div class="monthly-learning-analysis">${rows.join("")}</div>`;
 }
 
 function showMonthlyPreview(studentName) {
@@ -623,6 +667,7 @@ function showMonthlyPreview(studentName) {
         <div><span>테스트 평균</span><strong>${percentText(row.tests.averagePercent)}</strong><small>${row.tests.count}회 응시</small></div>
         <div><span>질문 문항</span><strong>${row.homework.questionCount}개</strong><small>이번 달 체크</small></div>
       </div>
+      ${monthlyLearningHtml(row.learning)}
       <div class="monthly-report-comment">
         <h3>이번 달 학습 이야기</h3>
         <p contenteditable="true">${escapeHtml(monthlyNarrative(row))}</p>

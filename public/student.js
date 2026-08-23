@@ -75,6 +75,7 @@ const assignmentViewTitle = document.querySelector("#assignmentViewTitle");
 const assignmentViewRange = document.querySelector("#assignmentViewRange");
 const studentRecordMonth = document.querySelector("#studentRecordMonth");
 const studentRecordSummary = document.querySelector("#studentRecordSummary");
+const studentLearningAnalysis = document.querySelector("#studentLearningAnalysis");
 const studentAttendanceHistory = document.querySelector("#studentAttendanceHistory");
 const studentTestHistory = document.querySelector("#studentTestHistory");
 const studentRecordsMessage = document.querySelector("#studentRecordsMessage");
@@ -306,6 +307,37 @@ function renderStudentRecords(payload) {
     </div>
   `;
 
+  const learning = payload.learning || {};
+  const analysisGroups = [
+    ["잘한 단원", learning.strong || [], "strong"],
+    ["더 연습할 단원", learning.weak || [], "weak"],
+  ].filter(([, rows]) => rows.length);
+  if ((learning.weakTypes || []).length) {
+    analysisGroups.push(["취약 유형", learning.weakTypes.map((topic) => ({ topic, percent: null })), "types"]);
+  }
+  studentLearningAnalysis.hidden = analysisGroups.length === 0;
+  studentLearningAnalysis.innerHTML = analysisGroups.length
+    ? `
+      <h3>이번 달 단원 분석</h3>
+      <div class="student-learning-analysis-grid">
+        ${analysisGroups
+          .map(
+            ([label, rows, tone]) => `
+              <div class="student-learning-group ${tone}">
+                <span>${escapeHtml(label)}</span>
+                <p>${rows
+                  .map(
+                    (row) => `<strong>${escapeHtml(row.topic)}</strong>${row.percent === null ? "" : `<small>${escapeHtml(row.percent)}%</small>`}`,
+                  )
+                  .join("")}</p>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    `
+    : "";
+
   studentAttendanceHistory.innerHTML = attendance.rows?.length
     ? attendance.rows
         .slice()
@@ -330,6 +362,7 @@ function renderStudentRecords(payload) {
               <div>
                 <strong>${escapeHtml(test.name)}</strong>
                 <small>${escapeHtml(displayIsoDate(test.date))}</small>
+                ${(test.topics || []).length ? `<small class="test-topic-list">${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
               </div>
               <span>${test.absent ? "미응시" : `${escapeHtml(test.score)} / ${escapeHtml(test.maxScore)}`}</span>
               <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>

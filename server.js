@@ -130,6 +130,11 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function normalizeLabelList(value) {
+  const values = Array.isArray(value) ? value : normalizeText(value).split(/[,\n]/);
+  return [...new Set(values.map((item) => normalizeText(item)).filter(Boolean))];
+}
+
 function normalizeClassName(value) {
   return normalizeText(value) || DEFAULT_CLASS;
 }
@@ -534,11 +539,23 @@ function normalizeData(data) {
       date: normalizeText(test.date),
       name: normalizeText(test.name),
       maxScore: Number(test.maxScore),
+      topics: normalizeLabelList(test.topics),
       scores: test.scores && typeof test.scores === "object" ? test.scores : {},
       createdAt: test.createdAt || new Date().toISOString(),
       updatedAt: test.updatedAt || test.createdAt || new Date().toISOString(),
     }))
     .filter((test) => test.name && /^\d{4}-\d{2}-\d{2}$/.test(test.date) && test.maxScore > 0);
+  data.monthlyLearningAnalyses = Array.isArray(data.monthlyLearningAnalyses) ? data.monthlyLearningAnalyses : [];
+  data.monthlyLearningAnalyses = data.monthlyLearningAnalyses
+    .map((analysis) => ({
+      className: normalizeClassName(analysis.className),
+      studentName: normalizeText(analysis.studentName),
+      month: normalizeText(analysis.month),
+      strongTypes: normalizeLabelList(analysis.strongTypes),
+      weakTypes: normalizeLabelList(analysis.weakTypes),
+      sourceDate: normalizeText(analysis.sourceDate),
+    }))
+    .filter((analysis) => analysis.studentName && /^\d{4}-\d{2}$/.test(analysis.month));
   return data;
 }
 
@@ -742,6 +759,7 @@ function publicTest(test, students = []) {
     date: test.date,
     name: test.name,
     maxScore: test.maxScore,
+    topics: normalizeLabelList(test.topics),
     scores: Object.fromEntries(students.map((student) => [student, normalizedScore(test.scores[student])])),
     createdAt: test.createdAt,
     updatedAt: test.updatedAt,
@@ -766,9 +784,53 @@ function testSummaryForStudent(data, className, studentName, month = "") {
       date: test.date,
       name: test.name,
       maxScore: test.maxScore,
+      topics: normalizeLabelList(test.topics),
       ...result,
       percent: result.score === null ? null : Math.round((result.score / test.maxScore) * 1000) / 10,
     })),
+  };
+}
+
+function topicAnalysisForStudent(data, className, studentName, month) {
+  const targetClass = normalizeClassName(className);
+  const topicRows = new Map();
+  data.tests
+    .filter((test) => test.className === targetClass && test.date.startsWith(`${month}-`))
+    .forEach((test) => {
+      const result = normalizedScore(test.scores[studentName]);
+      if (result.score === null) {
+        return;
+      }
+      normalizeLabelList(test.topics).forEach((topic) => {
+        const row = topicRows.get(topic) || { topic, score: 0, maxScore: 0, count: 0 };
+        row.score += result.score;
+        row.maxScore += test.maxScore;
+        row.count += 1;
+        topicRows.set(topic, row);
+      });
+    });
+
+  const topics = [...topicRows.values()]
+    .map((row) => ({
+      ...row,
+      percent: row.maxScore ? Math.round((row.score / row.maxScore) * 1000) / 10 : null,
+    }))
+    .sort((a, b) => b.percent - a.percent || b.count - a.count || a.topic.localeCompare(b.topic, "ko"));
+  const strong = topics.filter((row) => row.percent >= 80).slice(0, 3);
+  const weak = topics
+    .filter((row) => row.percent < 80)
+    .sort((a, b) => a.percent - b.percent || b.count - a.count || a.topic.localeCompare(b.topic, "ko"))
+    .slice(0, 3);
+  const saved = data.monthlyLearningAnalyses.find(
+    (analysis) => analysis.className === targetClass && analysis.studentName === studentName && analysis.month === month,
+  );
+  return {
+    topics,
+    strong,
+    weak,
+    strongTypes: saved ? saved.strongTypes : [],
+    weakTypes: saved ? saved.weakTypes : [],
+    sourceDate: saved ? saved.sourceDate : "",
   };
 }
 
@@ -800,6 +862,7 @@ function monthlySummary(data, className, month) {
     homework: homeworkSummaryForStudent(data, targetClass, studentName, monthValue),
     attendance: attendanceSummaryForStudent(data, targetClass, studentName, monthValue),
     tests: testSummaryForStudent(data, targetClass, studentName, monthValue),
+    learning: topicAnalysisForStudent(data, targetClass, studentName, monthValue),
   }));
 }
 
@@ -1078,6 +1141,7 @@ async function handleApi(req, res, pathname) {
         date,
         name,
         maxScore,
+        topics: normalizeLabelList(body.topics),
         scores: {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1108,6 +1172,9 @@ async function handleApi(req, res, pathname) {
       }
       if (body.maxScore !== undefined && Number(body.maxScore) > 0) {
         test.maxScore = Number(body.maxScore);
+      }
+      if (body.topics !== undefined) {
+        test.topics = normalizeLabelList(body.topics);
       }
       if (body.scores && typeof body.scores === "object") {
         test.scores = Object.fromEntries(

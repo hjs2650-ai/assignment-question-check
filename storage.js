@@ -1,7 +1,7 @@
 const fs = require("fs");
 
 function emptyData() {
-  return { assignments: [], classes: [], attendance: [], tests: [] };
+  return { assignments: [], classes: [], attendance: [], tests: [], monthlyLearningAnalyses: [] };
 }
 
 function compactData(data) {
