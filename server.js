@@ -1206,6 +1206,42 @@ async function handleApi(req, res, pathname) {
     return;
   }
 
+  const monthlyAnalysisMatch = pathname.match(/^\/api\/classes\/([^/]+)\/monthly-analysis$/);
+  if (req.method === "POST" && monthlyAnalysisMatch) {
+    const className = decodeURIComponent(monthlyAnalysisMatch[1]);
+    const classInfo = classInfoFor(data, className);
+    if (!classInfo) {
+      sendJson(res, 404, { error: "반 명단을 찾을 수 없습니다." });
+      return;
+    }
+    const body = await readBody(req);
+    const studentName = normalizeText(body.studentName);
+    const month = normalizeText(body.month);
+    if (!classInfo.students.includes(studentName) || !/^\d{4}-\d{2}$/.test(month)) {
+      sendJson(res, 400, { error: "학생명과 분석 월을 확인해 주세요." });
+      return;
+    }
+    const analysis = {
+      className: classInfo.name,
+      studentName,
+      month,
+      strongTypes: normalizeLabelList(body.strongTypes),
+      weakTypes: normalizeLabelList(body.weakTypes),
+      sourceDate: normalizeText(body.sourceDate),
+    };
+    const analysisIndex = data.monthlyLearningAnalyses.findIndex(
+      (item) => item.className === classInfo.name && item.studentName === studentName && item.month === month,
+    );
+    if (analysisIndex >= 0) {
+      data.monthlyLearningAnalyses[analysisIndex] = analysis;
+    } else {
+      data.monthlyLearningAnalyses.push(analysis);
+    }
+    await store.write(data);
+    sendJson(res, 200, { ok: true, analysis });
+    return;
+  }
+
   const classPasswordsMatch = pathname.match(/^\/api\/classes\/([^/]+)\/passwords$/);
   if (classPasswordsMatch) {
     const className = decodeURIComponent(classPasswordsMatch[1]);
