@@ -786,16 +786,25 @@ function testSummaryForStudent(data, className, studentName, month = "") {
     count: scored.length,
     averagePercent: percentages.length ? Math.round((percentages.reduce((sum, value) => sum + value, 0) / percentages.length) * 10) / 10 : null,
     bestPercent: percentages.length ? Math.max(...percentages) : null,
-    tests: tests.map(({ test, result }) => ({
-      id: test.id,
-      date: test.date,
-      name: test.name,
-      kind: "test",
-      maxScore: test.maxScore,
-      topics: normalizeLabelList(test.topics),
-      ...result,
-      percent: result.score === null ? null : Math.round((result.score / test.maxScore) * 1000) / 10,
-    })),
+    tests: tests.map(({ test, result }) => {
+      const classPercentages = Object.values(test.scores || {})
+        .map((score) => normalizedScore(score))
+        .filter((score) => score.score !== null)
+        .map((score) => (score.score / test.maxScore) * 100);
+      return {
+        id: test.id,
+        date: test.date,
+        name: test.name,
+        kind: "test",
+        maxScore: test.maxScore,
+        topics: normalizeLabelList(test.topics),
+        ...result,
+        percent: result.score === null ? null : Math.round((result.score / test.maxScore) * 1000) / 10,
+        classPercent: classPercentages.length
+          ? Math.round((classPercentages.reduce((sum, value) => sum + value, 0) / classPercentages.length) * 10) / 10
+          : null,
+      };
+    }),
   };
 }
 

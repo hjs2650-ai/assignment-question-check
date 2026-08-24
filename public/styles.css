@@ -1499,6 +1499,38 @@ summary {
   max-width: none;
 }
 
+.score-chart-legend {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  width: fit-content;
+  gap: 14px;
+  margin: 1px 8px 4px;
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--student-muted, var(--muted));
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.score-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-chart-legend i {
+  width: 22px;
+  border-top: 3px solid #d78572;
+}
+
+.score-chart-legend .class-average i {
+  border-top-color: #6f9dce;
+  border-top-style: dashed;
+}
+
 .score-grid line {
   stroke: #eee5e2;
   stroke-width: 1;
@@ -1518,10 +1550,25 @@ summary {
   stroke-width: 4;
 }
 
+.score-class-line {
+  fill: none;
+  stroke: #6f9dce;
+  stroke-dasharray: 8 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
 .score-dots circle {
   fill: #fff;
   stroke: #d78572;
   stroke-width: 4;
+}
+
+.score-class-dots circle {
+  fill: #fff;
+  stroke: #6f9dce;
+  stroke-width: 3;
 }
 
 .score-dots .score-value {

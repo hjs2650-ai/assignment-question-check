@@ -243,7 +243,7 @@ function setStudentRecordSection(section = "overview") {
   });
   if (section === "overview") {
     requestAnimationFrame(() => {
-      studentScoreTrendChart.scrollLeft = studentScoreTrendChart.scrollWidth;
+      studentScoreTrendChart.scrollLeft = 0;
     });
   }
 }
@@ -331,6 +331,14 @@ function renderScoreTrend(tests = []) {
   const xAt = (index) => left + (rows.length === 1 ? plotWidth / 2 : (plotWidth * index) / (rows.length - 1));
   const yAt = (percent) => top + ((100 - Math.max(0, Math.min(100, percent))) / 100) * plotHeight;
   const points = rows.map((test, index) => `${xAt(index)},${yAt(test.percent)}`).join(" ");
+  const classPoints = rows
+    .map((test, index) => (
+      test.classPercent === null || test.classPercent === undefined
+        ? ""
+        : `${xAt(index)},${yAt(test.classPercent)}`
+    ))
+    .filter(Boolean)
+    .join(" ");
   const grid = [100, 80, 60, 40].map((value) => {
     const y = yAt(value);
     return `
@@ -349,20 +357,33 @@ function renderScoreTrend(tests = []) {
       </g>
     `;
   });
+  const classDots = rows.map((test, index) => {
+    if (test.classPercent === null || test.classPercent === undefined) {
+      return "";
+    }
+    return `<circle cx="${xAt(index)}" cy="${yAt(test.classPercent)}" r="4" />`;
+  });
 
   studentScoreTrendChart.innerHTML = `
+    <div class="score-chart-legend" aria-label="성적 그래프 범례">
+      <span class="student"><i></i>내 점수</span>
+      <span class="class-average"><i></i>반 평균</span>
+    </div>
     <svg viewBox="0 0 ${width} ${height}" style="width:${width}px" role="img" aria-label="테스트 성적 변화 그래프">
       <g class="score-grid">${grid.join("")}</g>
+      ${classPoints ? `<polyline class="score-class-line" points="${classPoints}" />` : ""}
       <polyline class="score-line" points="${points}" />
+      <g class="score-class-dots">${classDots.join("")}</g>
       <g class="score-dots">${dots.join("")}</g>
     </svg>
   `;
-  studentScoreTrendChart.scrollLeft = studentScoreTrendChart.scrollWidth;
+  studentScoreTrendChart.scrollLeft = 0;
 }
 
 function renderStudentRecords(payload) {
   const homework = payload.homework || {};
   const attendance = payload.attendance || { counts: {}, rows: [] };
+  const monthlyTests = payload.tests || { tests: [] };
   const cumulativeTests = payload.cumulativeTests || { tests: [] };
   const cumulativeRelearning = payload.cumulativeRelearning || { rows: [] };
   const classComparison = payload.classComparison || { level: "unavailable", label: "비교할 기록이 아직 없어요" };
@@ -374,7 +395,7 @@ function renderStudentRecords(payload) {
     </div>
   `;
 
-  renderScoreTrend(cumulativeTests.tests || []);
+  renderScoreTrend(monthlyTests.tests || []);
 
   const learning = payload.learning || {};
   const topicRows = learning.topics || [];
