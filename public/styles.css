@@ -1441,6 +1441,16 @@ summary {
   background: #eff8f3;
 }
 
+.student-record-summary .comparison-summary.comparison-excellent {
+  border-left-color: #46956a;
+  background: #e8f6ee;
+}
+
+.student-record-summary .comparison-summary.comparison-developing {
+  border-left-color: #d7a34e;
+  background: #fff9e9;
+}
+
 .student-record-summary .comparison-summary.comparison-below {
   border-left-color: #d78572;
   background: #fff4f1;

@@ -907,13 +907,27 @@ function classTestComparisonForStudent(data, className, studentName, month = "")
     return { level: "unavailable", label: "비교할 기록이 아직 없어요", count: 0 };
   }
   const difference = differences.reduce((sum, value) => sum + value, 0) / differences.length;
-  if (difference >= 5) {
-    return { level: "above", label: "반 평균보다 높은 편이에요", count: differences.length };
+  if (difference >= 15) {
+    return { level: "excellent", label: "성적 아주 좋아. 이대로 쭉 가자.", count: differences.length };
   }
-  if (difference <= -5) {
-    return { level: "below", label: "반 평균보다 조금 더 연습이 필요해요", count: differences.length };
+  if (difference >= 8) {
+    return { level: "above", label: "잘했어! 지금처럼 꾸준히만 하자.", count: differences.length };
   }
-  return { level: "similar", label: "반 평균과 비슷한 흐름이에요", count: differences.length };
+  if (difference > -8) {
+    return { level: "similar", label: "잘하고 있어. 틀린 문제만 조금 더 챙기자.", count: differences.length };
+  }
+  if (difference > -15) {
+    return {
+      level: "developing",
+      label: "여기서 조금만 더 해보자. 어려웠던 부분은 쌤이 같이 도와줄게.",
+      count: differences.length,
+    };
+  }
+  return {
+    level: "below",
+    label: "지금부터 다시 하면 돼. 모르는 부분은 쌤이랑 천천히 잡아보자.",
+    count: differences.length,
+  };
 }
 
 function topicAnalysisForStudent(data, className, studentName, month) {
