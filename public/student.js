@@ -151,7 +151,7 @@ function updateVideoHomeSummary() {
   }
   const monthVideos = videosForSelectedMonth();
   const monthNumber = Number((studentRecordMonth.value || localMonthValue()).slice(5, 7));
-  homeVideoValue.textContent = monthVideos.length ? `${monthNumber}월 ${monthVideos.length}개` : `${monthNumber}월 영상 없음`;
+  homeVideoValue.textContent = monthVideos.length ? `${monthVideos.length}개` : "영상 없음";
   if (monthVideos.length) {
     homeVideoAlert.querySelector("strong").textContent = "최근 수업 영상";
     homeVideoAlert.querySelector("span").textContent = monthVideos[0].title;
