@@ -177,6 +177,7 @@
             종류
             <select name="kind">
               <option value="test">일반 테스트</option>
+              <option value="past_exam">기출 테스트</option>
               <option value="relearning">보완학습</option>
             </select>
           </label>
@@ -212,6 +213,7 @@
                 종류
                 <select id="selectedTestKind">
                   <option value="test">일반 테스트</option>
+                  <option value="past_exam">기출 테스트</option>
                   <option value="relearning">보완학습</option>
                 </select>
               </label>
@@ -226,7 +228,7 @@
           </section>
         </div>
         <section class="test-cumulative-section">
-          <h3>학생별 테스트 · 보완학습 현황</h3>
+          <h3>학생별 일반 · 기출 · 보완학습 현황</h3>
           <div id="testCumulativeTable" class="test-cumulative-table"></div>
         </section>
       </section>
@@ -237,10 +239,13 @@
             <p class="eyebrow">학부모 안내용 월간 요약</p>
             <h2>월간 리포트</h2>
           </div>
-          <label>
-            결과 월
-            <input id="monthlyReportMonth" type="month" />
-          </label>
+          <div class="actions">
+            <label>
+              결과 월
+              <input id="monthlyReportMonth" type="month" />
+            </label>
+            <button id="monthlyBackupButton" class="ghost" type="button">이번 달 기록 백업</button>
+          </div>
         </div>
         <div id="monthlyStudentList" class="monthly-student-list"></div>
         <section id="monthlyReportPreview" class="monthly-report-preview" hidden></section>

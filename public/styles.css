@@ -1622,7 +1622,7 @@ summary {
 }
 
 .student-record-test-columns {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .student-record-single-column {
@@ -2099,6 +2099,10 @@ summary {
   padding: 8px 10px;
 }
 
+.test-cumulative-row {
+  grid-template-columns: minmax(110px, 1.3fr) repeat(5, minmax(72px, 0.7fr));
+}
+
 .test-cumulative-row.is-head,
 .monthly-student-row.is-head {
   min-height: 40px;
@@ -2147,7 +2151,7 @@ summary {
 
 .monthly-report-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin: 22px 0;
 }
@@ -2164,6 +2168,7 @@ summary {
 .monthly-report-metrics > div:nth-child(3) { border-left-color: #e7a100; }
 .monthly-report-metrics > div:nth-child(4) { border-left-color: #c2413a; }
 .monthly-report-metrics > div:nth-child(5) { border-left-color: #9a72b8; }
+.monthly-report-metrics > div:nth-child(6) { border-left-color: #72ad8d; }
 
 .monthly-report-metrics span,
 .monthly-report-metrics small {
@@ -2258,10 +2263,46 @@ summary {
   margin: 0;
 }
 
+.class-video-scope {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  border: 1px solid var(--student-line, var(--line));
+  border-radius: 7px;
+  padding: 3px;
+  background: #f8f5f4;
+}
+
+.class-video-scope button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 5px;
+  padding: 7px 12px;
+  background: transparent;
+  color: var(--student-muted, var(--muted));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.class-video-scope button.is-active {
+  background: #fff;
+  color: var(--student-coral-dark, #a65042);
+  box-shadow: 0 2px 8px rgba(87, 68, 70, 0.09);
+}
+
 .class-video-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+.class-video-month-empty {
+  grid-column: 1 / -1;
+  margin: 10px 0 4px;
+  text-align: center;
 }
 
 .class-video-item {
@@ -2514,17 +2555,25 @@ body[data-theme="night"] .range-text {
     padding: 15px 14px 17px;
   }
 
+  .class-videos-head {
+    align-items: end;
+  }
+
+  .class-video-scope button {
+    min-height: 36px;
+    padding: 6px 9px;
+    font-size: 13px;
+  }
+
   .class-video-list {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 12px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: thin;
+    overflow-x: visible;
   }
 
   .class-video-item {
-    flex: 0 0 min(76vw, 290px);
-    scroll-snap-align: start;
+    width: 100%;
   }
 
   .class-video-list.is-expanded {
@@ -2536,6 +2585,14 @@ body[data-theme="night"] .range-text {
 
   .class-video-list.is-expanded .class-video-item {
     width: 100%;
+  }
+
+  .test-cumulative-table {
+    overflow-x: auto;
+  }
+
+  .test-cumulative-row {
+    min-width: 720px;
   }
 
   .student-login-gate {

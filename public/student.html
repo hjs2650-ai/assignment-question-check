@@ -151,7 +151,10 @@
               <p class="eyebrow">다시 보는 수업</p>
               <h2 id="classVideosTitle">수업 영상</h2>
             </div>
-            <button id="classVideosToggle" class="ghost" type="button" hidden>전체 보기</button>
+            <div class="class-video-scope" aria-label="수업영상 범위">
+              <button id="classVideosMonthButton" class="is-active" type="button">이번 달 영상</button>
+              <button id="classVideosToggle" type="button">전체 영상</button>
+            </div>
           </div>
           <div id="classVideoList" class="class-video-list"></div>
         </section>
@@ -307,6 +310,10 @@
               <section>
                 <h3>테스트 누적 기록</h3>
                 <div id="studentTestHistory" class="student-history-list"></div>
+              </section>
+              <section>
+                <h3>기출 테스트 기록</h3>
+                <div id="studentPastExamHistory" class="student-history-list"></div>
               </section>
               <section>
                 <h3>보완학습 기록</h3>

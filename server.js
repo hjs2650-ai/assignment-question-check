@@ -538,7 +538,11 @@ function normalizeData(data) {
       className: normalizeClassName(test.className),
       date: normalizeText(test.date),
       name: normalizeText(test.name),
-      kind: test.kind === "relearning" || /재학습/.test(normalizeText(test.name)) ? "relearning" : "test",
+      kind: test.kind === "relearning" || /재학습/.test(normalizeText(test.name))
+        ? "relearning"
+        : test.kind === "past_exam"
+          ? "past_exam"
+          : "test",
       maxScore: Number(test.maxScore),
       topics: normalizeLabelList(test.topics),
       scores: test.scores && typeof test.scores === "object" ? test.scores : {},
@@ -759,7 +763,7 @@ function publicTest(test, students = []) {
     className: test.className,
     date: test.date,
     name: test.name,
-    kind: test.kind === "relearning" ? "relearning" : "test",
+    kind: test.kind === "relearning" ? "relearning" : test.kind === "past_exam" ? "past_exam" : "test",
     maxScore: test.maxScore,
     topics: normalizeLabelList(test.topics),
     scores: Object.fromEntries(students.map((student) => [student, normalizedScore(test.scores[student])])),
@@ -774,7 +778,7 @@ function testSummaryForStudent(data, className, studentName, month = "") {
     .filter(
       (test) =>
         test.className === targetClass &&
-        test.kind !== "relearning" &&
+        test.kind === "test" &&
         (!month || test.date.startsWith(`${month}-`)),
     )
     .map((test) => ({ test, result: normalizedScore(test.scores[studentName]) }))
@@ -840,6 +844,38 @@ function relearningSummaryForStudent(data, className, studentName, month = "") {
   };
 }
 
+function pastExamSummaryForStudent(data, className, studentName, month = "") {
+  const targetClass = normalizeClassName(className);
+  const tests = data.tests
+    .filter(
+      (test) =>
+        test.className === targetClass &&
+        test.kind === "past_exam" &&
+        (!month || test.date.startsWith(`${month}-`)),
+    )
+    .map((test) => ({ test, result: normalizedScore(test.scores[studentName]) }))
+    .filter(({ result }) => result.score !== null || result.absent)
+    .sort((a, b) => b.test.date.localeCompare(a.test.date));
+  const scored = tests.filter(({ result }) => result.score !== null);
+  const percentages = scored.map(({ test, result }) => Math.round((result.score / test.maxScore) * 1000) / 10);
+  return {
+    count: scored.length,
+    averagePercent: percentages.length
+      ? Math.round((percentages.reduce((sum, value) => sum + value, 0) / percentages.length) * 10) / 10
+      : null,
+    tests: tests.map(({ test, result }) => ({
+      id: test.id,
+      date: test.date,
+      name: test.name,
+      kind: "past_exam",
+      maxScore: test.maxScore,
+      topics: normalizeLabelList(test.topics),
+      ...result,
+      percent: result.score === null ? null : Math.round((result.score / test.maxScore) * 1000) / 10,
+    })),
+  };
+}
+
 function classTestComparisonForStudent(data, className, studentName, month = "") {
   const targetClass = normalizeClassName(className);
   const students = studentsForClass(data, targetClass);
@@ -847,7 +883,7 @@ function classTestComparisonForStudent(data, className, studentName, month = "")
     .filter(
       (test) =>
         test.className === targetClass &&
-        test.kind !== "relearning" &&
+        test.kind === "test" &&
         (!month || test.date.startsWith(`${month}-`)),
     )
     .map((test) => {
@@ -887,7 +923,7 @@ function topicAnalysisForStudent(data, className, studentName, month) {
     .filter(
       (test) =>
         test.className === targetClass &&
-        test.kind !== "relearning" &&
+        test.kind === "test" &&
         test.date.startsWith(`${month}-`),
     )
     .forEach((test) => {
@@ -956,6 +992,7 @@ function monthlySummary(data, className, month) {
     homework: homeworkSummaryForStudent(data, targetClass, studentName, monthValue),
     attendance: attendanceSummaryForStudent(data, targetClass, studentName, monthValue),
     tests: testSummaryForStudent(data, targetClass, studentName, monthValue),
+    pastExams: pastExamSummaryForStudent(data, targetClass, studentName, monthValue),
     classComparison: classTestComparisonForStudent(data, targetClass, studentName, monthValue),
     relearning: relearningSummaryForStudent(data, targetClass, studentName, monthValue),
     learning: topicAnalysisForStudent(data, targetClass, studentName, monthValue),
@@ -1132,6 +1169,7 @@ async function handleApi(req, res, pathname) {
       studentName: session.studentName,
       ...monthly,
       cumulativeTests: testSummaryForStudent(data, session.className, session.studentName),
+      cumulativePastExams: pastExamSummaryForStudent(data, session.className, session.studentName),
       cumulativeRelearning: relearningSummaryForStudent(data, session.className, session.studentName),
     });
     return;
@@ -1237,7 +1275,7 @@ async function handleApi(req, res, pathname) {
         className: classInfo.name,
         date,
         name,
-        kind: body.kind === "relearning" ? "relearning" : "test",
+        kind: body.kind === "relearning" ? "relearning" : body.kind === "past_exam" ? "past_exam" : "test",
         maxScore,
         topics: normalizeLabelList(body.topics),
         scores: {},
@@ -1268,7 +1306,7 @@ async function handleApi(req, res, pathname) {
       if (body.name !== undefined && normalizeText(body.name)) {
         test.name = normalizeText(body.name);
       }
-      if (body.kind === "test" || body.kind === "relearning") {
+      if (body.kind === "test" || body.kind === "past_exam" || body.kind === "relearning") {
         test.kind = body.kind;
       }
       if (body.maxScore !== undefined && Number(body.maxScore) > 0) {
@@ -1303,6 +1341,44 @@ async function handleApi(req, res, pathname) {
       className: normalizeClassName(className),
       month,
       students: monthlySummary(data, className, month),
+    });
+    return;
+  }
+
+  const classBackupMatch = pathname.match(/^\/api\/classes\/([^/]+)\/backup$/);
+  if (req.method === "GET" && classBackupMatch) {
+    const className = normalizeClassName(decodeURIComponent(classBackupMatch[1]));
+    const classInfo = classInfoFor(data, className);
+    if (!classInfo) {
+      sendJson(res, 404, { error: "반 명단을 찾을 수 없습니다." });
+      return;
+    }
+    const month = normalizeMonth(new URL(req.url, "http://localhost").searchParams.get("month"));
+    const backup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      month,
+      className: classInfo.name,
+      class: {
+        students: classInfo.students,
+        studentStartDates: classInfo.studentStartDates || {},
+        schools: STUDENT_SCHOOLS[classInfo.name] || {},
+      },
+      assignments: data.assignments.filter(
+        (assignment) => assignment.className === classInfo.name && assignmentDate(assignment).startsWith(`${month}-`),
+      ),
+      attendance: data.attendance.filter(
+        (record) => record.className === classInfo.name && record.date.startsWith(`${month}-`),
+      ),
+      tests: data.tests.filter(
+        (test) => test.className === classInfo.name && test.date.startsWith(`${month}-`),
+      ),
+      monthlyLearningAnalyses: data.monthlyLearningAnalyses.filter(
+        (analysis) => analysis.className === classInfo.name && analysis.month === month,
+      ),
+    };
+    sendJson(res, 200, backup, {
+      "Content-Disposition": `attachment; filename="class-records-${month}.json"`,
     });
     return;
   }

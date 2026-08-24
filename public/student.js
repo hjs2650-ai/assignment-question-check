@@ -37,6 +37,7 @@ const checkMissingBtn = document.querySelector("#checkMissingBtn");
 const studentMissingResult = document.querySelector("#studentMissingResult");
 const classVideos = document.querySelector("#classVideos");
 const classVideoList = document.querySelector("#classVideoList");
+const classVideosMonthButton = document.querySelector("#classVideosMonthButton");
 const classVideosToggle = document.querySelector("#classVideosToggle");
 const videoEmptyState = document.querySelector("#videoEmptyState");
 const studentAuthLoading = document.querySelector("#studentAuthLoading");
@@ -86,6 +87,7 @@ const studentScoreTrendChart = document.querySelector("#studentScoreTrendChart")
 const studentLearningAnalysis = document.querySelector("#studentLearningAnalysis");
 const studentAttendanceHistory = document.querySelector("#studentAttendanceHistory");
 const studentTestHistory = document.querySelector("#studentTestHistory");
+const studentPastExamHistory = document.querySelector("#studentPastExamHistory");
 const studentRelearningHistory = document.querySelector("#studentRelearningHistory");
 const studentRecordsMessage = document.querySelector("#studentRecordsMessage");
 
@@ -100,8 +102,7 @@ let targetClassName = routeType === "class" ? routeValue : "";
 let recordsLoadedForMonth = "";
 let schoolLookupTimer = 0;
 let loadedClassVideos = [];
-let allClassVideosVisible = false;
-const VIDEO_PREVIEW_LIMIT = 6;
+let classVideoScope = "month";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -139,9 +140,35 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function videosForSelectedMonth() {
+  const month = studentRecordMonth.value || localMonthValue();
+  return loadedClassVideos.filter((video) => String(video.publishedAt || "").slice(0, 7) === month);
+}
+
+function updateVideoHomeSummary() {
+  if (!loadedClassVideos.length) {
+    return;
+  }
+  const monthVideos = videosForSelectedMonth();
+  const monthNumber = Number((studentRecordMonth.value || localMonthValue()).slice(5, 7));
+  homeVideoValue.textContent = monthVideos.length ? `${monthNumber}월 ${monthVideos.length}개` : `${monthNumber}월 영상 없음`;
+  if (monthVideos.length) {
+    homeVideoAlert.querySelector("strong").textContent = "최근 수업 영상";
+    homeVideoAlert.querySelector("span").textContent = monthVideos[0].title;
+    return;
+  }
+  homeVideoAlert.querySelector("strong").textContent = `${monthNumber}월 수업 영상이 아직 없어요`;
+  homeVideoAlert.querySelector("span").textContent = "전체 영상에서 이전 수업을 확인할 수 있어요.";
+}
+
 function renderClassVideos() {
-  const videos = allClassVideosVisible ? loadedClassVideos : loadedClassVideos.slice(0, VIDEO_PREVIEW_LIMIT);
-  classVideoList.classList.toggle("is-expanded", allClassVideosVisible);
+  const month = studentRecordMonth.value || localMonthValue();
+  const monthNumber = Number(month.slice(5, 7));
+  const videos = classVideoScope === "all" ? loadedClassVideos : videosForSelectedMonth();
+  classVideoList.classList.toggle("is-expanded", classVideoScope === "all");
+  classVideosMonthButton.textContent = `${monthNumber}월 영상`;
+  classVideosMonthButton.classList.toggle("is-active", classVideoScope === "month");
+  classVideosToggle.classList.toggle("is-active", classVideoScope === "all");
   classVideoList.innerHTML = videos
     .map(
       (video) => `
@@ -154,9 +181,8 @@ function renderClassVideos() {
         </a>
       `,
     )
-    .join("");
-  classVideosToggle.hidden = loadedClassVideos.length <= VIDEO_PREVIEW_LIMIT;
-  classVideosToggle.textContent = allClassVideosVisible ? "간단히 보기" : "전체 보기";
+    .join("") || `<p class="muted class-video-month-empty">${monthNumber}월에 등록된 수업 영상이 아직 없어요.</p>`;
+  updateVideoHomeSummary();
 }
 
 async function loadClassVideos(className) {
@@ -167,8 +193,7 @@ async function loadClassVideos(className) {
     const payload = await api(`/api/classes/${encodeURIComponent(className)}/videos`);
     if (!payload.configured || !payload.videos?.length) {
       loadedClassVideos = [];
-      allClassVideosVisible = false;
-      classVideosToggle.hidden = true;
+      classVideoScope = "month";
       classVideos.hidden = true;
       videoEmptyState.hidden = false;
       homeVideoValue.textContent = "등록 영상 없음";
@@ -178,17 +203,13 @@ async function loadClassVideos(className) {
     }
 
     loadedClassVideos = payload.videos;
-    allClassVideosVisible = false;
+    classVideoScope = "month";
     renderClassVideos();
     classVideos.hidden = false;
     videoEmptyState.hidden = true;
-    homeVideoValue.textContent = `새 영상 ${payload.videos.length}개`;
-    homeVideoAlert.querySelector("strong").textContent = "새 수업 영상이 올라왔어";
-    homeVideoAlert.querySelector("span").textContent = payload.videos[0].title;
   } catch (error) {
     loadedClassVideos = [];
-    allClassVideosVisible = false;
-    classVideosToggle.hidden = true;
+    classVideoScope = "month";
     classVideos.hidden = true;
     videoEmptyState.hidden = false;
     homeVideoValue.textContent = "확인 필요";
@@ -262,6 +283,9 @@ function updateMonthTriggers(month = studentRecordMonth.value || localMonthValue
   const label = monthRecordLabel(month);
   studentDashboardMonth.textContent = label;
   studentGraphMonthButton.textContent = label;
+  if (loadedClassVideos.length) {
+    renderClassVideos();
+  }
 }
 
 function openStudentMonthPicker() {
@@ -430,6 +454,7 @@ function renderStudentRecords(payload) {
   const attendance = payload.attendance || { counts: {}, rows: [] };
   const monthlyTests = payload.tests || { tests: [] };
   const cumulativeTests = payload.cumulativeTests || { tests: [] };
+  const cumulativePastExams = payload.cumulativePastExams || { tests: [] };
   const cumulativeRelearning = payload.cumulativeRelearning || { rows: [] };
   const classComparison = payload.classComparison || { level: "unavailable", label: "비교할 기록이 아직 없어요" };
   studentRecordSummary.innerHTML = `
@@ -510,6 +535,24 @@ function renderStudentRecords(payload) {
         )
         .join("")
     : `<p class="muted">등록된 테스트 결과가 아직 없습니다.</p>`;
+
+  studentPastExamHistory.innerHTML = cumulativePastExams.tests?.length
+    ? cumulativePastExams.tests
+        .map(
+          (test) => `
+            <div class="student-history-row test-history-row past-exam-history-row">
+              <div>
+                <strong>${escapeHtml(test.name)}</strong>
+                <small>${escapeHtml(displayIsoDate(test.date))}</small>
+                ${(test.topics || []).length ? `<small class="test-topic-list">${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
+              </div>
+              <span>${test.absent ? "미응시" : `${escapeHtml(test.score)} / ${escapeHtml(test.maxScore)}`}</span>
+              <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>
+            </div>
+          `,
+        )
+        .join("")
+    : `<p class="muted">등록된 기출 테스트 결과가 아직 없습니다.</p>`;
 
   studentRelearningHistory.innerHTML = cumulativeRelearning.rows?.length
     ? cumulativeRelearning.rows
@@ -1171,12 +1214,13 @@ homeMissingAlert.addEventListener("click", () => {
   loadStudentMissingStatus();
 });
 homeVideoAlert.addEventListener("click", () => setStudentMainView("videos"));
-classVideosToggle.addEventListener("click", () => {
-  allClassVideosVisible = !allClassVideosVisible;
+classVideosMonthButton.addEventListener("click", () => {
+  classVideoScope = "month";
   renderClassVideos();
-  if (!allClassVideosVisible) {
-    classVideos.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+});
+classVideosToggle.addEventListener("click", () => {
+  classVideoScope = "all";
+  renderClassVideos();
 });
 homeViewButtons.forEach((button) => {
   button.addEventListener("click", () => {

@@ -49,6 +49,7 @@ const monthlyReportMonth = document.querySelector("#monthlyReportMonth");
 const monthlyStudentList = document.querySelector("#monthlyStudentList");
 const monthlyReportPreview = document.querySelector("#monthlyReportPreview");
 const monthlyReportMessage = document.querySelector("#monthlyReportMessage");
+const monthlyBackupButton = document.querySelector("#monthlyBackupButton");
 const defaultClasses = [];
 const fixedClassOrder = ["고1 1티어D3", "고1 제니트Z2", "고1 SKYA3"];
 let latestAssignments = [];
@@ -451,14 +452,24 @@ function selectedTest() {
   return teacherTests.find((test) => test.id === selectedTestId);
 }
 
+function testKindLabel(kind) {
+  if (kind === "relearning") {
+    return "보완학습";
+  }
+  if (kind === "past_exam") {
+    return "기출 테스트";
+  }
+  return "일반 테스트";
+}
+
 function renderTestCumulative() {
   testCumulativeTable.innerHTML = testStudents.length
     ? `
-      <div class="test-cumulative-row is-head"><span>학생</span><span>테스트</span><span>평균</span><span>최근</span><span>보완학습</span></div>
+      <div class="test-cumulative-row is-head"><span>학생</span><span>일반</span><span>평균</span><span>최근</span><span>기출</span><span>보완학습</span></div>
       ${testStudents
         .map((student) => {
           const results = teacherTests
-            .filter((test) => test.kind !== "relearning")
+            .filter((test) => test.kind === "test")
             .map((test) => ({ test, result: test.scores?.[student] }))
             .filter(({ result }) => result && result.score !== null && result.score !== undefined);
           const relearning = teacherTests
@@ -468,6 +479,14 @@ function renderTestCumulative() {
           const relearningCompleted = relearning.filter(
             ({ result }) => result.score !== null && result.score !== undefined,
           ).length;
+          const pastExams = teacherTests
+            .filter((test) => test.kind === "past_exam")
+            .map((test) => ({ test, result: test.scores?.[student] }))
+            .filter(({ result }) => result && result.score !== null && result.score !== undefined);
+          const pastExamPercentages = pastExams.map(({ test, result }) => (Number(result.score) / test.maxScore) * 100);
+          const pastExamAverage = pastExamPercentages.length
+            ? Math.round((pastExamPercentages.reduce((sum, value) => sum + value, 0) / pastExamPercentages.length) * 10) / 10
+            : null;
           const percentages = results.map(({ test, result }) => (Number(result.score) / test.maxScore) * 100);
           const average = percentages.length
             ? Math.round((percentages.reduce((sum, value) => sum + value, 0) / percentages.length) * 10) / 10
@@ -479,6 +498,7 @@ function renderTestCumulative() {
               <span>${results.length}회</span>
               <span>${percentText(average)}</span>
               <span>${latest ? `${escapeHtml(latest.result.score)}/${escapeHtml(latest.test.maxScore)}` : "-"}</span>
+              <span>${pastExams.length ? `${pastExams.length}회 · ${percentText(pastExamAverage)}` : "-"}</span>
               <span>${relearningCompleted}/${relearning.length}회</span>
             </div>
           `;
@@ -497,7 +517,7 @@ function renderTestEditor() {
   testScoreEditor.hidden = false;
   selectedTestDate.textContent = `${displayIsoDate(test.date)} · ${test.maxScore}점 만점`;
   selectedTestTitle.textContent = test.name;
-  selectedTestKind.value = test.kind === "relearning" ? "relearning" : "test";
+  selectedTestKind.value = test.kind;
   selectedTestTopics.value = (test.topics || []).join(", ");
   testScoreRows.innerHTML = testStudents
     .map((student) => {
@@ -539,7 +559,7 @@ function renderTests() {
           (test) => `
             <button class="teacher-test-item ${test.id === selectedTestId ? "is-active" : ""}" type="button" data-id="${test.id}">
               <strong>${escapeHtml(test.name)}</strong>
-              <span>${test.kind === "relearning" ? "보완학습" : "일반 테스트"} · ${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점</span>
+              <span>${testKindLabel(test.kind)} · ${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점</span>
               ${(test.topics || []).length ? `<small>${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
             </button>
           `,
@@ -615,6 +635,9 @@ function monthlyNarrative(row) {
   if (row.tests.count) {
     parts.push(`이번 달 테스트 평균은 ${row.tests.averagePercent}%입니다.`);
   }
+  if (row.pastExams?.count) {
+    parts.push(`기출 테스트는 ${row.pastExams.count}회 응시했고 평균은 ${row.pastExams.averagePercent}%입니다.`);
+  }
   if (row.relearning?.completed) {
     parts.push(`보완학습은 ${row.relearning.count}회 중 ${row.relearning.completed}회 완료했습니다.`);
   }
@@ -679,6 +702,7 @@ function showMonthlyPreview(studentName) {
         <div><span>과제 제출률</span><strong>${percentText(row.homework.rate)}</strong><small>${row.homework.submitted}/${row.homework.total}회</small></div>
         <div><span>출석률</span><strong>${percentText(row.attendance.rate)}</strong><small>결석 ${row.attendance.counts.absent}회 · 지각 ${row.attendance.counts.late}회</small></div>
         <div><span>테스트 평균</span><strong>${percentText(row.tests.averagePercent)}</strong><small>${row.tests.count}회 응시</small></div>
+        <div><span>기출 테스트</span><strong>${percentText(row.pastExams?.averagePercent)}</strong><small>${row.pastExams?.count || 0}회 응시</small></div>
         <div><span>보완학습</span><strong>${row.relearning.completed}/${row.relearning.count}회</strong><small>정답 ${row.relearning.score}/${row.relearning.maxScore}문항</small></div>
         <div><span>질문 문항</span><strong>${row.homework.questionCount}개</strong><small>이번 달 체크</small></div>
       </div>
@@ -1506,6 +1530,18 @@ monthlyReportMonth.addEventListener("change", () => {
     monthlyReportMessage.className = "message error";
     monthlyReportMessage.textContent = error.message;
   });
+});
+
+monthlyBackupButton.addEventListener("click", () => {
+  const month = monthlyReportMonth.value || localMonth();
+  const link = document.createElement("a");
+  link.href = `/api/classes/${encodeURIComponent(selectedClassName)}/backup?month=${encodeURIComponent(month)}`;
+  link.download = `${selectedClassName}-${month}-기록백업.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  monthlyReportMessage.className = "message success";
+  monthlyReportMessage.textContent = `${month.replace("-", "년 ")}월 기록 백업을 내려받았습니다.`;
 });
 
 attendanceMonth.value = localMonth();
