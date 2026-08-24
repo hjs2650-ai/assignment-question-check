@@ -58,6 +58,7 @@ const studentRecordsView = document.querySelector("#studentRecordsView");
 const studentVideoView = document.querySelector("#studentVideoView");
 const studentGreetingName = document.querySelector("#studentGreetingName");
 const studentDashboardMonth = document.querySelector("#studentDashboardMonth");
+const studentGraphMonthButton = document.querySelector("#studentGraphMonthButton");
 const homeHomeworkValue = document.querySelector("#homeHomeworkValue");
 const homeAttendanceValue = document.querySelector("#homeAttendanceValue");
 const homeTestValue = document.querySelector("#homeTestValue");
@@ -232,6 +233,30 @@ function percentText(value) {
   return value === null || value === undefined ? "기록 없음" : `${value}%`;
 }
 
+function monthRecordLabel(month) {
+  const monthNumber = Number(String(month || localMonthValue()).slice(5, 7));
+  return `${monthNumber}월 기록`;
+}
+
+function updateMonthTriggers(month = studentRecordMonth.value || localMonthValue()) {
+  const label = monthRecordLabel(month);
+  studentDashboardMonth.textContent = label;
+  studentGraphMonthButton.textContent = label;
+}
+
+function openStudentMonthPicker() {
+  try {
+    if (typeof studentRecordMonth.showPicker === "function") {
+      studentRecordMonth.showPicker();
+      return;
+    }
+  } catch {
+    // Fall back to the native input click when showPicker is unavailable.
+  }
+  studentRecordMonth.focus();
+  studentRecordMonth.click();
+}
+
 function setStudentRecordSection(section = "overview") {
   studentRecordOverview.hidden = section !== "overview";
   studentRecordTests.hidden = section !== "tests";
@@ -273,7 +298,7 @@ function renderStudentHomeSummary(payload) {
   const monthlyTests = payload.tests || {};
   const homeworkRate = Number.isFinite(Number(homework.rate)) ? Number(homework.rate) : 0;
 
-  studentDashboardMonth.textContent = `${Number(String(payload.month || localMonthValue()).slice(5, 7))}월 기록`;
+  updateMonthTriggers(payload.month);
   homeHomeworkValue.textContent = `${homework.submitted || 0} / ${homework.total || 0}`;
   homeAttendanceValue.textContent = `${attendance.attended || 0} / ${attendance.total || 0}`;
   homeTestValue.textContent = monthlyTests.averagePercent === null || monthlyTests.averagePercent === undefined
@@ -490,6 +515,7 @@ function renderStudentRecords(payload) {
 async function loadStudentRecords(force = false) {
   const month = studentRecordMonth.value || localMonthValue();
   studentRecordMonth.value = month;
+  updateMonthTriggers(month);
   if (!force && recordsLoadedForMonth === month) {
     return;
   }
@@ -581,6 +607,7 @@ loginStudentName.addEventListener("blur", updateLoginSchoolName);
 
 async function bootstrapStudentApp() {
   studentRecordMonth.value = localMonthValue();
+  updateMonthTriggers();
   await resolveTargetClassName();
   if (!targetClassName) {
     throw new Error("반 정보를 확인하지 못했습니다.");
@@ -1146,7 +1173,11 @@ studentRecordTabs.forEach((button) => {
   button.addEventListener("click", () => setStudentRecordSection(button.dataset.recordSection));
 });
 
+studentDashboardMonth.addEventListener("click", openStudentMonthPicker);
+studentGraphMonthButton.addEventListener("click", openStudentMonthPicker);
+
 studentRecordMonth.addEventListener("change", () => {
+  updateMonthTriggers();
   recordsLoadedForMonth = "";
   loadStudentRecords(true).catch((error) => {
     studentRecordsMessage.className = "message error";

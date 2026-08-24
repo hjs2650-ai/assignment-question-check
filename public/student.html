@@ -64,6 +64,7 @@
           <button id="studentLogoutButton" type="button">로그아웃</button>
         </div>
       </header>
+      <input id="studentRecordMonth" class="student-shared-month-input" type="month" aria-label="기록 월 선택" tabindex="-1" />
 
       <section id="studentHomeView" class="student-main-view student-home-view">
         <section class="student-dashboard-welcome">
@@ -75,7 +76,7 @@
         <section class="student-dashboard-main">
           <div class="student-dashboard-section-head">
             <h2>내 학습 한눈에</h2>
-            <span id="studentDashboardMonth">이번 달 기록</span>
+            <button id="studentDashboardMonth" class="student-month-trigger" type="button">이번 달 기록</button>
           </div>
           <div class="student-dashboard-stats">
             <button class="student-dashboard-stat homework" type="button" data-home-view="assignment">
@@ -281,10 +282,6 @@
               <p class="eyebrow">나의 학습 흐름</p>
               <h2>내 기록</h2>
             </div>
-            <label>
-              확인할 달
-              <input id="studentRecordMonth" type="month" />
-            </label>
           </div>
           <nav class="student-record-tabs" aria-label="내 기록 메뉴">
             <button class="student-record-tab is-active" type="button" data-record-section="overview" aria-selected="true">테스트 분석</button>
@@ -299,7 +296,7 @@
                   <p class="eyebrow">점수의 흐름</p>
                   <h3>성적 변화 그래프</h3>
                 </div>
-                <span>선택한 달</span>
+                <button id="studentGraphMonthButton" class="student-month-trigger" type="button">이번 달 기록</button>
               </div>
               <div id="studentScoreTrendChart" class="student-score-trend-chart"></div>
             </section>

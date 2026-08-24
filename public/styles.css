@@ -1475,7 +1475,8 @@ summary {
   margin: 0;
 }
 
-.student-analysis-heading > span {
+.student-analysis-heading > span,
+.student-analysis-heading > .student-month-trigger {
   border: 1px solid #eadedb;
   border-radius: 999px;
   padding: 5px 9px;
@@ -1483,6 +1484,43 @@ summary {
   color: var(--student-muted, var(--muted));
   font-size: 12px;
   font-weight: 800;
+}
+
+.student-shared-month-input {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.student-month-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid var(--student-line, #eadedb);
+  border-radius: 999px;
+  padding: 5px 11px;
+  background: #fff;
+  color: var(--student-muted, var(--muted));
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.student-month-trigger::after {
+  content: "▾";
+  font-size: 11px;
+}
+
+.student-month-trigger:hover {
+  border-color: var(--student-coral, #d78572);
+  color: var(--student-coral-dark, #a65042);
 }
 
 .student-score-trend-chart {
@@ -2545,7 +2583,8 @@ body[data-theme="night"] .range-text {
     align-items: start;
   }
 
-  .student-analysis-heading > span {
+  .student-analysis-heading > span,
+  .student-analysis-heading > .student-month-trigger {
     flex: 0 0 auto;
   }
 
@@ -2838,6 +2877,10 @@ body[data-theme="night"] .range-text {
 .student-dashboard-section-head span {
   color: var(--student-muted);
   font-size: 13px;
+}
+
+.student-dashboard-section-head .student-month-trigger {
+  color: var(--student-muted);
 }
 
 .student-dashboard-stats {
