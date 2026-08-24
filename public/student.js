@@ -74,6 +74,10 @@ const homeViewButtons = [...document.querySelectorAll("[data-home-view]")];
 const assignmentViewTitle = document.querySelector("#assignmentViewTitle");
 const assignmentViewRange = document.querySelector("#assignmentViewRange");
 const studentRecordMonth = document.querySelector("#studentRecordMonth");
+const studentRecordTabs = [...document.querySelectorAll(".student-record-tab")];
+const studentRecordOverview = document.querySelector("#studentRecordOverview");
+const studentRecordTests = document.querySelector("#studentRecordTests");
+const studentRecordAttendance = document.querySelector("#studentRecordAttendance");
 const studentRecordSummary = document.querySelector("#studentRecordSummary");
 const studentScoreTrend = document.querySelector("#studentScoreTrend");
 const studentScoreTrendChart = document.querySelector("#studentScoreTrendChart");
@@ -228,6 +232,22 @@ function percentText(value) {
   return value === null || value === undefined ? "기록 없음" : `${value}%`;
 }
 
+function setStudentRecordSection(section = "overview") {
+  studentRecordOverview.hidden = section !== "overview";
+  studentRecordTests.hidden = section !== "tests";
+  studentRecordAttendance.hidden = section !== "attendance";
+  studentRecordTabs.forEach((button) => {
+    const active = button.dataset.recordSection === section;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  if (section === "overview") {
+    requestAnimationFrame(() => {
+      studentScoreTrendChart.scrollLeft = studentScoreTrendChart.scrollWidth;
+    });
+  }
+}
+
 function setStudentMainView(view) {
   studentHomeView.hidden = view !== "home";
   studentAssignmentView.hidden = view !== "assignment";
@@ -239,9 +259,7 @@ function setStudentMainView(view) {
     button.setAttribute("aria-selected", String(active));
   });
   if (view === "records") {
-    requestAnimationFrame(() => {
-      studentScoreTrendChart.scrollLeft = studentScoreTrendChart.scrollWidth;
-    });
+    setStudentRecordSection("overview");
     loadStudentRecords().catch((error) => {
       studentRecordsMessage.className = "message error";
       studentRecordsMessage.textContent = error.message;
@@ -333,7 +351,7 @@ function renderScoreTrend(tests = []) {
   });
 
   studentScoreTrendChart.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" style="width:${width}px" role="img" aria-label="일반 테스트 성적 변화 그래프">
+    <svg viewBox="0 0 ${width} ${height}" style="width:${width}px" role="img" aria-label="테스트 성적 변화 그래프">
       <g class="score-grid">${grid.join("")}</g>
       <polyline class="score-line" points="${points}" />
       <g class="score-dots">${dots.join("")}</g>
@@ -349,30 +367,10 @@ function renderStudentRecords(payload) {
   const cumulativeRelearning = payload.cumulativeRelearning || { rows: [] };
   const classComparison = payload.classComparison || { level: "unavailable", label: "비교할 기록이 아직 없어요" };
   studentRecordSummary.innerHTML = `
-    <div>
-      <span>과제 제출률</span>
-      <strong>${percentText(homework.rate)}</strong>
-      <small>${homework.submitted || 0}/${homework.total || 0}회 제출</small>
-    </div>
-    <div>
-      <span>출석률</span>
-      <strong>${percentText(attendance.rate)}</strong>
-      <small>결석 ${attendance.counts?.absent || 0}회 · 지각 ${attendance.counts?.late || 0}회</small>
-    </div>
-    <div>
-      <span>누적 테스트 평균</span>
-      <strong>${percentText(cumulativeTests.averagePercent)}</strong>
-      <small>${cumulativeTests.count || 0}회 응시</small>
-    </div>
-    <div>
-      <span>보완학습</span>
-      <strong>${cumulativeRelearning.completed || 0}회</strong>
-      <small>${cumulativeRelearning.count || 0}회 중 완료</small>
-    </div>
     <div class="comparison-summary comparison-${escapeHtml(classComparison.level)}">
       <span>반 평균과 비교</span>
       <strong class="comparison-label">${escapeHtml(classComparison.label)}</strong>
-      <small>이번 달 일반 테스트 기준</small>
+      <small>이번 달 테스트 결과</small>
     </div>
   `;
 
@@ -386,7 +384,7 @@ function renderStudentRecords(payload) {
     ? `
       <div class="student-analysis-heading">
         <div>
-          <p class="eyebrow">이번 달 일반 테스트 기준</p>
+          <p class="eyebrow">이번 달 테스트 결과</p>
           <h3>단원별 성취도</h3>
         </div>
       </div>
@@ -1111,6 +1109,10 @@ homeViewButtons.forEach((button) => {
 
 studentMainTabs.forEach((button) => {
   button.addEventListener("click", () => setStudentMainView(button.dataset.view));
+});
+
+studentRecordTabs.forEach((button) => {
+  button.addEventListener("click", () => setStudentRecordSection(button.dataset.recordSection));
 });
 
 studentRecordMonth.addEventListener("change", () => {

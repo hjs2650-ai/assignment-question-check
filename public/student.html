@@ -286,32 +286,43 @@
               <input id="studentRecordMonth" type="month" />
             </label>
           </div>
-          <div id="studentRecordSummary" class="student-record-summary"></div>
-          <section id="studentScoreTrend" class="student-score-trend" hidden>
-            <div class="student-analysis-heading">
-              <div>
-                <p class="eyebrow">점수의 흐름</p>
-                <h3>성적 변화 그래프</h3>
+          <nav class="student-record-tabs" aria-label="내 기록 메뉴">
+            <button class="student-record-tab is-active" type="button" data-record-section="overview" aria-selected="true">성적 분석</button>
+            <button class="student-record-tab" type="button" data-record-section="tests" aria-selected="false">테스트</button>
+            <button class="student-record-tab" type="button" data-record-section="attendance" aria-selected="false">출결</button>
+          </nav>
+          <section id="studentRecordOverview">
+            <div id="studentRecordSummary" class="student-record-summary"></div>
+            <section id="studentScoreTrend" class="student-score-trend" hidden>
+              <div class="student-analysis-heading">
+                <div>
+                  <p class="eyebrow">점수의 흐름</p>
+                  <h3>성적 변화 그래프</h3>
+                </div>
+                <span>누적 성적</span>
               </div>
-              <span>일반 테스트 기준</span>
-            </div>
-            <div id="studentScoreTrendChart" class="student-score-trend-chart"></div>
+              <div id="studentScoreTrendChart" class="student-score-trend-chart"></div>
+            </section>
+            <section id="studentLearningAnalysis" class="student-learning-analysis" hidden></section>
           </section>
-          <section id="studentLearningAnalysis" class="student-learning-analysis" hidden></section>
-          <div class="student-record-columns">
-            <section>
+          <section id="studentRecordTests" hidden>
+            <div class="student-record-columns student-record-test-columns">
+              <section>
+                <h3>테스트 누적 기록</h3>
+                <div id="studentTestHistory" class="student-history-list"></div>
+              </section>
+              <section>
+                <h3>보완학습 기록</h3>
+                <div id="studentRelearningHistory" class="student-history-list"></div>
+              </section>
+            </div>
+          </section>
+          <section id="studentRecordAttendance" hidden>
+            <section class="student-record-single-column">
               <h3>출결 기록</h3>
               <div id="studentAttendanceHistory" class="student-history-list"></div>
             </section>
-            <section>
-              <h3>테스트 누적 기록</h3>
-              <div id="studentTestHistory" class="student-history-list"></div>
-            </section>
-            <section>
-              <h3>보완학습 기록</h3>
-              <div id="studentRelearningHistory" class="student-history-list"></div>
-            </section>
-          </div>
+          </section>
           <p id="studentRecordsMessage" class="message"></p>
         </section>
       </section>

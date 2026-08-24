@@ -1360,6 +1360,32 @@ summary {
   margin: 0;
 }
 
+.student-record-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 20px;
+  border: 1px solid var(--student-line, var(--line));
+  border-radius: 8px;
+  padding: 4px;
+  background: #f8f5f4;
+}
+
+.student-record-tab {
+  min-height: 42px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--student-muted, var(--muted));
+  font-weight: 900;
+}
+
+.student-record-tab.is-active {
+  background: #fff;
+  color: var(--student-coral-dark, #a65042);
+  box-shadow: 0 2px 8px rgba(87, 68, 70, 0.09);
+}
+
 .student-record-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1507,6 +1533,14 @@ summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 26px;
+}
+
+.student-record-test-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.student-record-single-column {
+  width: min(560px, 100%);
 }
 
 .student-record-columns h3 {
