@@ -78,16 +78,16 @@
             <span id="studentDashboardMonth">이번 달 기록</span>
           </div>
           <div class="student-dashboard-stats">
-            <button class="student-dashboard-stat homework" type="button" data-home-view="records">
+            <button class="student-dashboard-stat homework" type="button" data-home-view="assignment">
               <span>과제 완료</span>
               <strong id="homeHomeworkValue">확인 중</strong>
             </button>
-            <button class="student-dashboard-stat attendance" type="button" data-home-view="records">
+            <button class="student-dashboard-stat attendance" type="button" data-home-view="records" data-record-section="attendance">
               <span>이번 달 출석</span>
               <strong id="homeAttendanceValue">확인 중</strong>
             </button>
-            <button class="student-dashboard-stat tests" type="button" data-home-view="records">
-              <span>테스트 누적 평균</span>
+            <button class="student-dashboard-stat tests" type="button" data-home-view="records" data-record-section="overview">
+              <span>이번 달 테스트 평균</span>
               <strong id="homeTestValue">확인 중</strong>
             </button>
             <button class="student-dashboard-stat videos" type="button" data-home-view="videos">
@@ -287,8 +287,8 @@
             </label>
           </div>
           <nav class="student-record-tabs" aria-label="내 기록 메뉴">
-            <button class="student-record-tab is-active" type="button" data-record-section="overview" aria-selected="true">성적 분석</button>
-            <button class="student-record-tab" type="button" data-record-section="tests" aria-selected="false">테스트</button>
+            <button class="student-record-tab is-active" type="button" data-record-section="overview" aria-selected="true">테스트 분석</button>
+            <button class="student-record-tab" type="button" data-record-section="tests" aria-selected="false">성적 기록</button>
             <button class="student-record-tab" type="button" data-record-section="attendance" aria-selected="false">출결</button>
           </nav>
           <section id="studentRecordOverview">

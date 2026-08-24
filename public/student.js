@@ -270,15 +270,15 @@ function setStudentMainView(view) {
 function renderStudentHomeSummary(payload) {
   const homework = payload.homework || {};
   const attendance = payload.attendance || {};
-  const cumulativeTests = payload.cumulativeTests || {};
+  const monthlyTests = payload.tests || {};
   const homeworkRate = Number.isFinite(Number(homework.rate)) ? Number(homework.rate) : 0;
 
   studentDashboardMonth.textContent = `${Number(String(payload.month || localMonthValue()).slice(5, 7))}월 기록`;
   homeHomeworkValue.textContent = `${homework.submitted || 0} / ${homework.total || 0}`;
   homeAttendanceValue.textContent = `${attendance.attended || 0} / ${attendance.total || 0}`;
-  homeTestValue.textContent = cumulativeTests.averagePercent === null || cumulativeTests.averagePercent === undefined
+  homeTestValue.textContent = monthlyTests.averagePercent === null || monthlyTests.averagePercent === undefined
     ? "기록 없음"
-    : `${cumulativeTests.averagePercent}%`;
+    : `${monthlyTests.averagePercent}%`;
   homeProgressValue.textContent = homework.rate === null || homework.rate === undefined ? "-" : `${homework.rate}%`;
   homeProgressBar.style.width = `${Math.max(0, Math.min(100, homeworkRate))}%`;
 }
@@ -1104,7 +1104,17 @@ homeMissingAlert.addEventListener("click", () => {
 });
 homeVideoAlert.addEventListener("click", () => setStudentMainView("videos"));
 homeViewButtons.forEach((button) => {
-  button.addEventListener("click", () => setStudentMainView(button.dataset.homeView));
+  button.addEventListener("click", () => {
+    const view = button.dataset.homeView;
+    if (view === "assignment") {
+      openAssignmentView("current");
+      return;
+    }
+    setStudentMainView(view);
+    if (view === "records" && button.dataset.recordSection) {
+      setStudentRecordSection(button.dataset.recordSection);
+    }
+  });
 });
 
 studentMainTabs.forEach((button) => {
