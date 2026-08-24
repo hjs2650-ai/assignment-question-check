@@ -1216,6 +1216,7 @@ summary {
 .student-auth-loading[hidden],
 .student-login-gate[hidden],
 .student-main-view[hidden],
+#videoEmptyState[hidden],
 #studentApp[hidden] {
   display: none !important;
 }
@@ -2524,6 +2525,17 @@ body[data-theme="night"] .range-text {
   .class-video-item {
     flex: 0 0 min(76vw, 290px);
     scroll-snap-align: start;
+  }
+
+  .class-video-list.is-expanded {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+
+  .class-video-list.is-expanded .class-video-item {
+    width: 100%;
   }
 
   .student-login-gate {

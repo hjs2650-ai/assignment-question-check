@@ -37,6 +37,7 @@ const checkMissingBtn = document.querySelector("#checkMissingBtn");
 const studentMissingResult = document.querySelector("#studentMissingResult");
 const classVideos = document.querySelector("#classVideos");
 const classVideoList = document.querySelector("#classVideoList");
+const classVideosToggle = document.querySelector("#classVideosToggle");
 const videoEmptyState = document.querySelector("#videoEmptyState");
 const studentAuthLoading = document.querySelector("#studentAuthLoading");
 const studentLoginGate = document.querySelector("#studentLoginGate");
@@ -98,6 +99,9 @@ let activeStudentSession = null;
 let targetClassName = routeType === "class" ? routeValue : "";
 let recordsLoadedForMonth = "";
 let schoolLookupTimer = 0;
+let loadedClassVideos = [];
+let allClassVideosVisible = false;
+const VIDEO_PREVIEW_LIMIT = 6;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -135,6 +139,26 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function renderClassVideos() {
+  const videos = allClassVideosVisible ? loadedClassVideos : loadedClassVideos.slice(0, VIDEO_PREVIEW_LIMIT);
+  classVideoList.classList.toggle("is-expanded", allClassVideosVisible);
+  classVideoList.innerHTML = videos
+    .map(
+      (video) => `
+        <a class="class-video-item" href="${escapeHtml(video.url)}" target="_blank" rel="noopener noreferrer">
+          <span class="class-video-thumbnail">
+            <img src="${escapeHtml(video.thumbnail)}" alt="" loading="lazy" />
+            <span class="class-video-play" aria-hidden="true"></span>
+          </span>
+          <strong>${escapeHtml(video.title)}</strong>
+        </a>
+      `,
+    )
+    .join("");
+  classVideosToggle.hidden = loadedClassVideos.length <= VIDEO_PREVIEW_LIMIT;
+  classVideosToggle.textContent = allClassVideosVisible ? "간단히 보기" : "전체 보기";
+}
+
 async function loadClassVideos(className) {
   if (!className) {
     return;
@@ -142,6 +166,9 @@ async function loadClassVideos(className) {
   try {
     const payload = await api(`/api/classes/${encodeURIComponent(className)}/videos`);
     if (!payload.configured || !payload.videos?.length) {
+      loadedClassVideos = [];
+      allClassVideosVisible = false;
+      classVideosToggle.hidden = true;
       classVideos.hidden = true;
       videoEmptyState.hidden = false;
       homeVideoValue.textContent = "등록 영상 없음";
@@ -150,25 +177,18 @@ async function loadClassVideos(className) {
       return;
     }
 
-    classVideoList.innerHTML = payload.videos
-      .map(
-        (video) => `
-          <a class="class-video-item" href="${escapeHtml(video.url)}" target="_blank" rel="noopener noreferrer">
-            <span class="class-video-thumbnail">
-              <img src="${escapeHtml(video.thumbnail)}" alt="" loading="lazy" />
-              <span class="class-video-play" aria-hidden="true"></span>
-            </span>
-            <strong>${escapeHtml(video.title)}</strong>
-          </a>
-        `,
-      )
-      .join("");
+    loadedClassVideos = payload.videos;
+    allClassVideosVisible = false;
+    renderClassVideos();
     classVideos.hidden = false;
     videoEmptyState.hidden = true;
     homeVideoValue.textContent = `새 영상 ${payload.videos.length}개`;
     homeVideoAlert.querySelector("strong").textContent = "새 수업 영상이 올라왔어";
     homeVideoAlert.querySelector("span").textContent = payload.videos[0].title;
   } catch (error) {
+    loadedClassVideos = [];
+    allClassVideosVisible = false;
+    classVideosToggle.hidden = true;
     classVideos.hidden = true;
     videoEmptyState.hidden = false;
     homeVideoValue.textContent = "확인 필요";
@@ -1151,6 +1171,13 @@ homeMissingAlert.addEventListener("click", () => {
   loadStudentMissingStatus();
 });
 homeVideoAlert.addEventListener("click", () => setStudentMainView("videos"));
+classVideosToggle.addEventListener("click", () => {
+  allClassVideosVisible = !allClassVideosVisible;
+  renderClassVideos();
+  if (!allClassVideosVisible) {
+    classVideos.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
 homeViewButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const view = button.dataset.homeView;

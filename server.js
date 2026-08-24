@@ -1045,7 +1045,7 @@ async function handleApi(req, res, pathname) {
       configured: result.configured,
       autoSync: result.autoSync,
       syncMode: result.syncMode,
-      videos: result.videos.filter((video) => videoMatchesClass(video.title, className)).slice(0, 12),
+      videos: result.videos.filter((video) => videoMatchesClass(video.title, className)),
     });
     return;
   }
