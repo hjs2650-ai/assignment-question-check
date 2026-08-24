@@ -831,6 +831,46 @@ function relearningSummaryForStudent(data, className, studentName, month = "") {
   };
 }
 
+function classTestComparisonForStudent(data, className, studentName, month = "") {
+  const targetClass = normalizeClassName(className);
+  const students = studentsForClass(data, targetClass);
+  const differences = data.tests
+    .filter(
+      (test) =>
+        test.className === targetClass &&
+        test.kind !== "relearning" &&
+        (!month || test.date.startsWith(`${month}-`)),
+    )
+    .map((test) => {
+      const studentResult = normalizedScore(test.scores[studentName]);
+      if (studentResult.score === null) {
+        return null;
+      }
+      const classPercentages = students
+        .map((student) => normalizedScore(test.scores[student]))
+        .filter((result) => result.score !== null)
+        .map((result) => (result.score / test.maxScore) * 100);
+      if (!classPercentages.length) {
+        return null;
+      }
+      const classAverage = classPercentages.reduce((sum, value) => sum + value, 0) / classPercentages.length;
+      return (studentResult.score / test.maxScore) * 100 - classAverage;
+    })
+    .filter((difference) => difference !== null);
+
+  if (!differences.length) {
+    return { level: "unavailable", label: "비교할 기록이 아직 없어요", count: 0 };
+  }
+  const difference = differences.reduce((sum, value) => sum + value, 0) / differences.length;
+  if (difference >= 5) {
+    return { level: "above", label: "반 평균보다 높은 편이에요", count: differences.length };
+  }
+  if (difference <= -5) {
+    return { level: "below", label: "반 평균보다 조금 더 연습이 필요해요", count: differences.length };
+  }
+  return { level: "similar", label: "반 평균과 비슷한 흐름이에요", count: differences.length };
+}
+
 function topicAnalysisForStudent(data, className, studentName, month) {
   const targetClass = normalizeClassName(className);
   const topicRows = new Map();
@@ -907,6 +947,7 @@ function monthlySummary(data, className, month) {
     homework: homeworkSummaryForStudent(data, targetClass, studentName, monthValue),
     attendance: attendanceSummaryForStudent(data, targetClass, studentName, monthValue),
     tests: testSummaryForStudent(data, targetClass, studentName, monthValue),
+    classComparison: classTestComparisonForStudent(data, targetClass, studentName, monthValue),
     relearning: relearningSummaryForStudent(data, targetClass, studentName, monthValue),
     learning: topicAnalysisForStudent(data, targetClass, studentName, monthValue),
   }));

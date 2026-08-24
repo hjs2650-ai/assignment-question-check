@@ -75,6 +75,8 @@ const assignmentViewTitle = document.querySelector("#assignmentViewTitle");
 const assignmentViewRange = document.querySelector("#assignmentViewRange");
 const studentRecordMonth = document.querySelector("#studentRecordMonth");
 const studentRecordSummary = document.querySelector("#studentRecordSummary");
+const studentScoreTrend = document.querySelector("#studentScoreTrend");
+const studentScoreTrendChart = document.querySelector("#studentScoreTrendChart");
 const studentLearningAnalysis = document.querySelector("#studentLearningAnalysis");
 const studentAttendanceHistory = document.querySelector("#studentAttendanceHistory");
 const studentTestHistory = document.querySelector("#studentTestHistory");
@@ -237,6 +239,9 @@ function setStudentMainView(view) {
     button.setAttribute("aria-selected", String(active));
   });
   if (view === "records") {
+    requestAnimationFrame(() => {
+      studentScoreTrendChart.scrollLeft = studentScoreTrendChart.scrollWidth;
+    });
     loadStudentRecords().catch((error) => {
       studentRecordsMessage.className = "message error";
       studentRecordsMessage.textContent = error.message;
@@ -286,11 +291,63 @@ async function loadStudentHomeStatus() {
   }
 }
 
+function renderScoreTrend(tests = []) {
+  const rows = tests
+    .filter((test) => test.percent !== null && test.percent !== undefined)
+    .slice()
+    .reverse();
+  studentScoreTrend.hidden = rows.length === 0;
+  if (!rows.length) {
+    studentScoreTrendChart.innerHTML = "";
+    return;
+  }
+
+  const width = Math.max(620, rows.length * 88);
+  const height = 230;
+  const left = 42;
+  const right = 32;
+  const top = 26;
+  const bottom = 48;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const xAt = (index) => left + (rows.length === 1 ? plotWidth / 2 : (plotWidth * index) / (rows.length - 1));
+  const yAt = (percent) => top + ((100 - Math.max(0, Math.min(100, percent))) / 100) * plotHeight;
+  const points = rows.map((test, index) => `${xAt(index)},${yAt(test.percent)}`).join(" ");
+  const grid = [100, 80, 60, 40].map((value) => {
+    const y = yAt(value);
+    return `
+      <line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" />
+      <text x="${left - 9}" y="${y + 4}" text-anchor="end">${value}</text>
+    `;
+  });
+  const dots = rows.map((test, index) => {
+    const x = xAt(index);
+    const y = yAt(test.percent);
+    return `
+      <g>
+        <circle cx="${x}" cy="${y}" r="5" />
+        <text class="score-value" x="${x}" y="${Math.max(14, y - 11)}" text-anchor="middle">${escapeHtml(test.percent)}%</text>
+        <text class="score-date" x="${x}" y="${height - 17}" text-anchor="middle">${escapeHtml(displayIsoDate(test.date))}</text>
+      </g>
+    `;
+  });
+
+  studentScoreTrendChart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" style="width:${width}px" role="img" aria-label="일반 테스트 성적 변화 그래프">
+      <g class="score-grid">${grid.join("")}</g>
+      <polyline class="score-line" points="${points}" />
+      <g class="score-dots">${dots.join("")}</g>
+    </svg>
+  `;
+  studentScoreTrendChart.scrollLeft = studentScoreTrendChart.scrollWidth;
+}
+
 function renderStudentRecords(payload) {
   const homework = payload.homework || {};
   const attendance = payload.attendance || { counts: {}, rows: [] };
   const cumulativeTests = payload.cumulativeTests || { tests: [] };
   const cumulativeRelearning = payload.cumulativeRelearning || { rows: [] };
+  const classComparison = payload.classComparison || { level: "unavailable", label: "비교할 기록이 아직 없어요" };
   studentRecordSummary.innerHTML = `
     <div>
       <span>과제 제출률</span>
@@ -312,36 +369,47 @@ function renderStudentRecords(payload) {
       <strong>${cumulativeRelearning.completed || 0}회</strong>
       <small>${cumulativeRelearning.count || 0}회 중 완료</small>
     </div>
+    <div class="comparison-summary comparison-${escapeHtml(classComparison.level)}">
+      <span>반 평균과 비교</span>
+      <strong class="comparison-label">${escapeHtml(classComparison.label)}</strong>
+      <small>이번 달 일반 테스트 기준</small>
+    </div>
   `;
 
+  renderScoreTrend(cumulativeTests.tests || []);
+
   const learning = payload.learning || {};
-  const analysisGroups = [
-    ["잘한 단원", learning.strong || [], "strong"],
-    ["더 연습할 단원", learning.weak || [], "weak"],
-  ].filter(([, rows]) => rows.length);
-  if ((learning.weakTypes || []).length) {
-    analysisGroups.push(["취약 유형", learning.weakTypes.map((topic) => ({ topic, percent: null })), "types"]);
-  }
-  studentLearningAnalysis.hidden = analysisGroups.length === 0;
-  studentLearningAnalysis.innerHTML = analysisGroups.length
+  const topicRows = learning.topics || [];
+  const weakTypes = learning.weakTypes || [];
+  studentLearningAnalysis.hidden = topicRows.length === 0 && weakTypes.length === 0;
+  studentLearningAnalysis.innerHTML = topicRows.length || weakTypes.length
     ? `
-      <h3>이번 달 단원 분석</h3>
-      <div class="student-learning-analysis-grid">
-        ${analysisGroups
-          .map(
-            ([label, rows, tone]) => `
-              <div class="student-learning-group ${tone}">
-                <span>${escapeHtml(label)}</span>
-                <p>${rows
-                  .map(
-                    (row) => `<strong>${escapeHtml(row.topic)}</strong>${row.percent === null ? "" : `<small>${escapeHtml(row.percent)}%</small>`}`,
-                  )
-                  .join("")}</p>
+      <div class="student-analysis-heading">
+        <div>
+          <p class="eyebrow">이번 달 일반 테스트 기준</p>
+          <h3>단원별 성취도</h3>
+        </div>
+      </div>
+      ${topicRows.length ? `
+        <div class="topic-achievement-list">
+          ${topicRows
+            .map(
+              (row) => `
+              <div class="topic-achievement-row ${row.percent >= 80 ? "is-strong" : row.percent >= 60 ? "is-steady" : "is-focus"}">
+                <div><strong>${escapeHtml(row.topic)}</strong><span>${escapeHtml(row.percent)}%</span></div>
+                <div class="topic-achievement-track"><i style="width:${Math.max(0, Math.min(100, row.percent))}%"></i></div>
               </div>
             `,
-          )
-          .join("")}
-      </div>
+            )
+            .join("")}
+        </div>
+      ` : ""}
+      ${weakTypes.length ? `
+        <div class="weak-type-summary">
+          <span>조금 더 연습할 유형</span>
+          <p>${weakTypes.map((topic) => `<strong>${escapeHtml(topic)}</strong>`).join("")}</p>
+        </div>
+      ` : ""}
     `
     : "";
 
