@@ -426,7 +426,7 @@ async function loadMaterials() {
   renderTeacherMaterials();
 }
 
-async function uploadMaterialInChunks(file, title) {
+async function uploadMaterialInChunks(file, title, position = {}) {
   const upload = await api("/api/materials/uploads", {
     method: "POST",
     body: JSON.stringify({
@@ -460,7 +460,8 @@ async function uploadMaterialInChunks(file, title) {
     offset = Number(payload.nextOffset) || endExclusive;
     completedMaterial = payload.material || completedMaterial;
     const percent = Math.min(100, Math.round((offset / file.size) * 100));
-    materialMessage.textContent = `Google Drive에 자료를 등록하는 중입니다. ${percent}%`;
+    const filePosition = position.total > 1 ? `${position.index}/${position.total} · ${file.name} · ` : "";
+    materialMessage.textContent = `Google Drive에 자료를 등록하는 중입니다. ${filePosition}${percent}%`;
   }
   return completedMaterial;
 }
@@ -1583,39 +1584,52 @@ teacherMainTabs.forEach((button) => {
 });
 
 materialFile.addEventListener("change", () => {
-  const file = materialFile.files[0];
-  if (file && !materialTitle.value.trim()) {
-    materialTitle.value = file.name.replace(/\.pdf$/i, "");
+  const files = Array.from(materialFile.files || []);
+  materialTitle.disabled = files.length > 1;
+  if (files.length > 1) {
+    materialTitle.value = "";
+  } else if (files[0] && !materialTitle.value.trim()) {
+    materialTitle.value = files[0].name.replace(/\.pdf$/i, "");
   }
 });
 
 materialUploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const file = materialFile.files[0];
+  const files = Array.from(materialFile.files || []);
   materialMessage.className = "message";
   materialMessage.textContent = "";
-  if (!file || !/\.pdf$/i.test(file.name)) {
+  if (!files.length || files.some((file) => !/\.pdf$/i.test(file.name))) {
     materialMessage.className = "message error";
-    materialMessage.textContent = "PDF 파일을 선택해 주세요.";
+    materialMessage.textContent = "PDF 파일만 선택해 주세요.";
     return;
   }
-  if (file.size > 500 * 1024 * 1024) {
+  const oversizedFile = files.find((file) => file.size > 500 * 1024 * 1024);
+  if (oversizedFile) {
     materialMessage.className = "message error";
-    materialMessage.textContent = "PDF 파일은 500MB 이하로 올려 주세요.";
+    materialMessage.textContent = `${oversizedFile.name} 파일은 500MB 이하로 올려 주세요.`;
     return;
   }
 
   materialUploadButton.disabled = true;
   materialMessage.textContent = "Google Drive에 자료를 등록하는 중입니다.";
+  let uploadedCount = 0;
   try {
-    await uploadMaterialInChunks(file, materialTitle.value.trim());
+    for (const [index, file] of files.entries()) {
+      const title = files.length === 1 ? materialTitle.value.trim() || file.name.replace(/\.pdf$/i, "") : file.name.replace(/\.pdf$/i, "");
+      await uploadMaterialInChunks(file, title, { index: index + 1, total: files.length });
+      uploadedCount += 1;
+    }
     materialUploadForm.reset();
+    materialTitle.disabled = false;
     materialMessage.className = "message success";
-    materialMessage.textContent = "학생 화면에 학습자료를 등록했습니다.";
+    materialMessage.textContent = `학생 화면에 학습자료 ${uploadedCount}개를 등록했습니다.`;
     await loadMaterials();
   } catch (error) {
     materialMessage.className = "message error";
-    materialMessage.textContent = error.message;
+    materialMessage.textContent = uploadedCount
+      ? `${uploadedCount}개 등록 후 중단되었습니다. ${error.message}`
+      : error.message;
+    await loadMaterials().catch(() => {});
   } finally {
     materialUploadButton.disabled = false;
   }
