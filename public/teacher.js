@@ -23,6 +23,15 @@ const assignmentManagementModule = document.querySelector("#assignmentManagement
 const attendanceManagementModule = document.querySelector("#attendanceManagementModule");
 const testManagementModule = document.querySelector("#testManagementModule");
 const monthlyManagementModule = document.querySelector("#monthlyManagementModule");
+const materialsManagementModule = document.querySelector("#materialsManagementModule");
+const materialUploadForm = document.querySelector("#materialUploadForm");
+const materialTitle = document.querySelector("#materialTitle");
+const materialFile = document.querySelector("#materialFile");
+const materialUploadButton = document.querySelector("#materialUploadButton");
+const materialClassLabel = document.querySelector("#materialClassLabel");
+const materialMessage = document.querySelector("#materialMessage");
+const teacherMaterialCount = document.querySelector("#teacherMaterialCount");
+const teacherMaterialList = document.querySelector("#teacherMaterialList");
 const attendanceMonth = document.querySelector("#attendanceMonth");
 const attendanceSummary = document.querySelector("#attendanceSummary");
 const attendanceDateTabs = document.querySelector("#attendanceDateTabs");
@@ -64,6 +73,7 @@ let teacherTests = [];
 let testStudents = [];
 let selectedTestId = "";
 let monthlyData = null;
+let teacherMaterials = [];
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -314,6 +324,8 @@ async function loadActiveTeacherModule() {
     await loadTests();
   } else if (teacherModule === "monthly") {
     await loadMonthlyReport();
+  } else if (teacherModule === "materials") {
+    await loadMaterials();
   }
 }
 
@@ -323,6 +335,7 @@ function setTeacherModule(module) {
   attendanceManagementModule.hidden = module !== "attendance";
   testManagementModule.hidden = module !== "tests";
   monthlyManagementModule.hidden = module !== "monthly";
+  materialsManagementModule.hidden = module !== "materials";
   teacherMainTabs.forEach((button) => {
     const active = button.dataset.module === module;
     button.classList.toggle("is-active", active);
@@ -333,9 +346,92 @@ function setTeacherModule(module) {
     return;
   }
   loadActiveTeacherModule().catch((error) => {
-    const target = module === "attendance" ? attendanceMessage : module === "tests" ? testMessage : monthlyReportMessage;
+    const target = module === "attendance"
+      ? attendanceMessage
+      : module === "tests"
+        ? testMessage
+        : module === "materials"
+          ? materialMessage
+          : monthlyReportMessage;
     target.className = "message error";
     target.textContent = error.message;
+  });
+}
+
+function materialDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function renderTeacherMaterials() {
+  materialClassLabel.textContent = shortClassName(selectedClassName);
+  teacherMaterialCount.textContent = `${teacherMaterials.length}개`;
+  teacherMaterialList.innerHTML = teacherMaterials.length
+    ? teacherMaterials
+        .map(
+          (material) => `
+            <article class="teacher-material-row">
+              <div>
+                <span>${escapeHtml(materialDateTime(material.createdAt))}</span>
+                <strong>${escapeHtml(material.title)}</strong>
+                <small>${escapeHtml(material.fileName)} · 열람 전용</small>
+              </div>
+              <div class="actions">
+                <a class="ghost" href="${escapeHtml(material.viewUrl || material.previewUrl)}" target="_blank" rel="noopener noreferrer">열어보기</a>
+                <button class="ghost danger delete-material" type="button" data-material-id="${escapeHtml(material.id)}">삭제</button>
+              </div>
+            </article>
+          `,
+        )
+        .join("")
+    : `<p class="muted">이 반에 등록된 학습자료가 없습니다.</p>`;
+
+  teacherMaterialList.querySelectorAll(".delete-material").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const material = teacherMaterials.find((item) => item.id === button.dataset.materialId);
+      if (!material || !window.confirm(`${material.title} 자료를 삭제하시겠습니까?`)) {
+        return;
+      }
+      button.disabled = true;
+      try {
+        await api(`/api/materials/${encodeURIComponent(material.id)}`, { method: "DELETE" });
+        materialMessage.className = "message success";
+        materialMessage.textContent = "학습자료를 삭제했습니다.";
+        await loadMaterials();
+      } catch (error) {
+        materialMessage.className = "message error";
+        materialMessage.textContent = error.message;
+        button.disabled = false;
+      }
+    });
+  });
+}
+
+async function loadMaterials() {
+  if (!selectedClassName) {
+    return;
+  }
+  materialClassLabel.textContent = shortClassName(selectedClassName);
+  teacherMaterialList.innerHTML = `<p class="muted">학습자료를 불러오는 중입니다.</p>`;
+  const payload = await api(`/api/classes/${encodeURIComponent(selectedClassName)}/materials`);
+  teacherMaterials = payload.materials || [];
+  renderTeacherMaterials();
+}
+
+function fileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "").split(",").pop() || ""));
+    reader.addEventListener("error", () => reject(new Error("PDF 파일을 읽지 못했습니다.")));
+    reader.readAsDataURL(file);
   });
 }
 
@@ -1284,7 +1380,13 @@ function renderTeacherClassTabs(classes) {
       } else {
         renderTeacherClassTabs(teacherClasses);
         loadActiveTeacherModule().catch((error) => {
-          const target = teacherModule === "attendance" ? attendanceMessage : teacherModule === "tests" ? testMessage : monthlyReportMessage;
+          const target = teacherModule === "attendance"
+            ? attendanceMessage
+            : teacherModule === "tests"
+              ? testMessage
+              : teacherModule === "materials"
+                ? materialMessage
+                : monthlyReportMessage;
           target.className = "message error";
           target.textContent = error.message;
         });
@@ -1448,6 +1550,57 @@ studentPasswordSettings.addEventListener("toggle", () => {
 
 teacherMainTabs.forEach((button) => {
   button.addEventListener("click", () => setTeacherModule(button.dataset.module));
+});
+
+materialFile.addEventListener("change", () => {
+  const file = materialFile.files[0];
+  if (file && !materialTitle.value.trim()) {
+    materialTitle.value = file.name.replace(/\.pdf$/i, "");
+  }
+});
+
+materialUploadForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const file = materialFile.files[0];
+  materialMessage.className = "message";
+  materialMessage.textContent = "";
+  if (!file || !/\.pdf$/i.test(file.name)) {
+    materialMessage.className = "message error";
+    materialMessage.textContent = "PDF 파일을 선택해 주세요.";
+    return;
+  }
+  if (file.size > 15 * 1024 * 1024) {
+    materialMessage.className = "message error";
+    materialMessage.textContent = "PDF 파일은 15MB 이하로 올려 주세요.";
+    return;
+  }
+
+  materialUploadButton.disabled = true;
+  materialMessage.textContent = "Google Drive에 자료를 등록하는 중입니다.";
+  try {
+    const base64 = await fileAsBase64(file);
+    await api("/api/materials", {
+      method: "POST",
+      body: JSON.stringify({
+        className: selectedClassName,
+        title: materialTitle.value.trim(),
+        file: {
+          name: file.name,
+          mimeType: file.type || "application/pdf",
+          base64,
+        },
+      }),
+    });
+    materialUploadForm.reset();
+    materialMessage.className = "message success";
+    materialMessage.textContent = "학생 화면에 학습자료를 등록했습니다.";
+    await loadMaterials();
+  } catch (error) {
+    materialMessage.className = "message error";
+    materialMessage.textContent = error.message;
+  } finally {
+    materialUploadButton.disabled = false;
+  }
 });
 
 attendanceMonth.addEventListener("change", () => {

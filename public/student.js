@@ -58,6 +58,16 @@ const studentHomeView = document.querySelector("#studentHomeView");
 const studentAssignmentView = document.querySelector("#studentAssignmentView");
 const studentRecordsView = document.querySelector("#studentRecordsView");
 const studentVideoView = document.querySelector("#studentVideoView");
+const studentMaterialsView = document.querySelector("#studentMaterialsView");
+const studentMaterialCount = document.querySelector("#studentMaterialCount");
+const studentMaterialsWorkspace = document.querySelector("#studentMaterialsWorkspace");
+const studentMaterialList = document.querySelector("#studentMaterialList");
+const studentMaterialViewerTitle = document.querySelector("#studentMaterialViewerTitle");
+const studentMaterialFrame = document.querySelector("#studentMaterialFrame");
+const studentMaterialFullscreen = document.querySelector("#studentMaterialFullscreen");
+const studentMaterialClose = document.querySelector("#studentMaterialClose");
+const studentMaterialsEmpty = document.querySelector("#studentMaterialsEmpty");
+const studentMaterialsMessage = document.querySelector("#studentMaterialsMessage");
 const studentGreetingName = document.querySelector("#studentGreetingName");
 const studentDashboardMonth = document.querySelector("#studentDashboardMonth");
 const studentGraphMonthButton = document.querySelector("#studentGraphMonthButton");
@@ -103,6 +113,8 @@ let recordsLoadedForMonth = "";
 let schoolLookupTimer = 0;
 let loadedClassVideos = [];
 let classVideoScope = "month";
+let loadedMaterials = [];
+let materialsLoaded = false;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -322,6 +334,7 @@ function setStudentMainView(view) {
   studentAssignmentView.hidden = view !== "assignment";
   studentRecordsView.hidden = view !== "records";
   studentVideoView.hidden = view !== "videos";
+  studentMaterialsView.hidden = view !== "materials";
   studentMainTabs.forEach((button) => {
     const active = button.dataset.view === view;
     button.classList.toggle("is-active", active);
@@ -334,6 +347,80 @@ function setStudentMainView(view) {
       studentRecordsMessage.textContent = error.message;
     });
   }
+  if (view === "materials") {
+    loadStudentMaterials().catch((error) => {
+      studentMaterialsMessage.className = "message error";
+      studentMaterialsMessage.textContent = error.message;
+    });
+  }
+}
+
+function materialDateLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+  }).format(date);
+}
+
+function selectStudentMaterial(materialId) {
+  const material = loadedMaterials.find((item) => item.id === materialId);
+  if (!material) {
+    return;
+  }
+  studentMaterialViewerTitle.textContent = material.title;
+  studentMaterialFrame.title = `${material.title} 열람`;
+  studentMaterialFrame.src = material.previewUrl;
+  studentMaterialFullscreen.hidden = false;
+  document.body.classList.add("material-viewer-open");
+  studentMaterialClose.focus();
+}
+
+function closeStudentMaterial() {
+  studentMaterialFullscreen.hidden = true;
+  studentMaterialFrame.removeAttribute("src");
+  document.body.classList.remove("material-viewer-open");
+}
+
+function renderStudentMaterials() {
+  studentMaterialCount.textContent = `${loadedMaterials.length}개`;
+  studentMaterialsEmpty.hidden = loadedMaterials.length > 0;
+  studentMaterialsWorkspace.hidden = loadedMaterials.length === 0;
+  if (!loadedMaterials.length) {
+    studentMaterialList.innerHTML = "";
+    studentMaterialFrame.removeAttribute("src");
+    return;
+  }
+  studentMaterialList.innerHTML = loadedMaterials
+    .map(
+      (material) => `
+        <button type="button" data-material-id="${escapeHtml(material.id)}" aria-pressed="false">
+          <span>${escapeHtml(materialDateLabel(material.createdAt))}</span>
+          <strong>${escapeHtml(material.title)}</strong>
+          <small>PDF · 열람 전용</small>
+        </button>
+      `,
+    )
+    .join("");
+  studentMaterialList.querySelectorAll("button[data-material-id]").forEach((button) => {
+    button.addEventListener("click", () => selectStudentMaterial(button.dataset.materialId));
+  });
+}
+
+async function loadStudentMaterials(force = false) {
+  if (materialsLoaded && !force) {
+    return;
+  }
+  studentMaterialsMessage.className = "message";
+  studentMaterialsMessage.textContent = "자료를 불러오는 중입니다.";
+  const payload = await api("/api/student/materials");
+  loadedMaterials = payload.materials || [];
+  materialsLoaded = true;
+  renderStudentMaterials();
+  studentMaterialsMessage.textContent = "";
 }
 
 function renderStudentHomeSummary(payload) {
@@ -1238,6 +1325,13 @@ homeViewButtons.forEach((button) => {
 
 studentMainTabs.forEach((button) => {
   button.addEventListener("click", () => setStudentMainView(button.dataset.view));
+});
+
+studentMaterialClose.addEventListener("click", closeStudentMaterial);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !studentMaterialFullscreen.hidden) {
+    closeStudentMaterial();
+  }
 });
 
 studentRecordTabs.forEach((button) => {

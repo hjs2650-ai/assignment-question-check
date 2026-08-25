@@ -12,6 +12,252 @@
   --soft: #eef4ff;
 }
 
+/* Learning materials */
+.student-main-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.teacher-main-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.student-materials-panel {
+  padding: 22px;
+}
+
+#studentMaterialsWorkspace[hidden],
+#studentMaterialsEmpty[hidden] {
+  display: none !important;
+}
+
+.student-materials-head,
+.student-material-viewer-head,
+.material-list-head,
+.teacher-material-row,
+.material-upload-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.student-materials-head {
+  margin-bottom: 18px;
+}
+
+.student-materials-head h2,
+.student-materials-head p,
+.material-list-head h3 {
+  margin: 0;
+}
+
+.student-materials-workspace {
+  display: block;
+}
+
+.student-material-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.student-material-list button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--student-line, var(--line));
+  border-radius: 7px;
+  padding: 13px;
+  background: #fff;
+  color: #29252a;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-material-list button:active {
+  border-color: var(--student-coral);
+  background: var(--student-coral-soft);
+}
+
+.student-material-list button > span {
+  grid-row: 1 / span 2;
+  align-self: start;
+  color: var(--student-coral-dark);
+  font-size: 13px;
+}
+
+.student-material-list button > strong,
+.student-material-list button > small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-material-list button > small {
+  color: #857e82;
+}
+
+.material-viewer-open {
+  overflow: hidden;
+}
+
+.student-material-fullscreen[hidden] {
+  display: none !important;
+}
+
+.student-material-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100dvh;
+  background: #f3f1f1;
+}
+
+.student-material-fullscreen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  border-bottom: 1px solid var(--student-line, var(--line));
+  background: #fff8f5;
+}
+
+.student-material-fullscreen-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.student-material-fullscreen-head button {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #5f5558;
+  font: inherit;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#studentMaterialFrame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: #f3f1f1;
+}
+
+.material-upload-form {
+  align-items: end;
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid var(--teacher-line, var(--line));
+  border-radius: 8px;
+  background: #fffaf8;
+}
+
+.material-upload-form label {
+  flex: 1 1 260px;
+}
+
+.material-upload-form button {
+  flex: 0 0 auto;
+  min-height: 46px;
+}
+
+.material-list-head {
+  margin: 24px 0 10px;
+}
+
+.teacher-material-list {
+  display: grid;
+  gap: 8px;
+}
+
+.teacher-material-row {
+  min-height: 76px;
+  border-bottom: 1px solid var(--teacher-line, var(--line));
+  padding: 12px 2px;
+}
+
+.teacher-material-row > div:first-child {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  min-width: 0;
+}
+
+.teacher-material-row span {
+  grid-row: 1 / span 2;
+  color: var(--teacher-coral-dark, #a94f45);
+  font-size: 13px;
+}
+
+.teacher-material-row strong,
+.teacher-material-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-material-row small {
+  color: var(--teacher-muted, var(--muted));
+}
+
+@media (max-width: 720px) {
+  .student-materials-panel {
+    padding: 15px;
+  }
+
+  .student-materials-workspace {
+    display: block;
+  }
+
+  .student-material-list {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .student-material-list button {
+    width: 100%;
+  }
+
+  .material-upload-form {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .material-upload-form label,
+  .material-upload-form button {
+    width: 100%;
+  }
+
+  .teacher-material-row {
+    align-items: flex-start;
+  }
+
+  .student-main-tab,
+  .teacher-main-tab {
+    font-size: 12px;
+  }
+}
+
 @media print {
   body {
     background: #fff !important;
@@ -3540,6 +3786,18 @@ body[data-theme="night"] .range-text {
 
   #homePastAssignmentButton {
     grid-column: auto;
+  }
+}
+
+.student-main-tabs,
+.teacher-main-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .student-main-tab,
+  .teacher-main-tab {
+    font-size: 12px;
   }
 }
 

@@ -1,7 +1,7 @@
 const fs = require("fs");
 
 function emptyData() {
-  return { assignments: [], classes: [], attendance: [], tests: [], monthlyLearningAnalyses: [] };
+  return { assignments: [], classes: [], attendance: [], tests: [], monthlyLearningAnalyses: [], materials: [] };
 }
 
 function compactData(data) {
@@ -64,6 +64,31 @@ function createLocalStore(localFile) {
           createdAt: new Date().toISOString(),
         };
       });
+    },
+    async uploadMaterial(className, file) {
+      const uploadDir = `${localFile}.materials`;
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const safeName = `${Date.now()}-${String(file.name || "material.pdf").replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+      fs.writeFileSync(`${uploadDir}/${safeName}`, Buffer.from(file.base64, "base64"));
+      return {
+        driveFileId: `local:${safeName}`,
+        previewUrl: `/api/material-content/${encodeURIComponent(safeName)}`,
+        viewUrl: `/api/material-content/${encodeURIComponent(safeName)}`,
+        downloadRestricted: true,
+      };
+    },
+    async deleteMaterial(fileId) {
+      const prefix = "local:";
+      if (!String(fileId || "").startsWith(prefix)) {
+        return;
+      }
+      const safeName = String(fileId).slice(prefix.length).replace(/[\\/]/g, "");
+      const target = `${localFile}.materials/${safeName}`;
+      if (fs.existsSync(target)) {
+        fs.unlinkSync(target);
+      }
     },
   };
 }
@@ -141,6 +166,16 @@ function createSheetsStore(sheetsUrl, sheetsSecret, fallbackStore) {
         files,
       });
       return payload.files || [];
+    },
+    async uploadMaterial(className, file) {
+      const payload = await request("uploadMaterial", {
+        className,
+        file,
+      });
+      return payload.file;
+    },
+    async deleteMaterial(fileId) {
+      await request("deleteMaterial", { fileId });
     },
   };
 }

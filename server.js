@@ -14,6 +14,7 @@ const YOUTUBE_OAUTH_CLIENT_ID = process.env.YOUTUBE_OAUTH_CLIENT_ID || "";
 const YOUTUBE_OAUTH_CLIENT_SECRET = process.env.YOUTUBE_OAUTH_CLIENT_SECRET || "";
 const YOUTUBE_OAUTH_REFRESH_TOKEN = process.env.YOUTUBE_OAUTH_REFRESH_TOKEN || "";
 const YOUTUBE_CACHE_MS = 15 * 60 * 1000;
+const MATERIAL_MAX_BYTES = 15 * 1024 * 1024;
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.SHEETS_SECRET || crypto.randomBytes(32).toString("hex");
 const SESSION_COOKIE = "hwangt_student_session";
 const SESSION_TTL_SECONDS = 365 * 24 * 60 * 60;
@@ -561,7 +562,36 @@ function normalizeData(data) {
       sourceDate: normalizeText(analysis.sourceDate),
     }))
     .filter((analysis) => analysis.studentName && /^\d{4}-\d{2}$/.test(analysis.month));
+  data.materials = Array.isArray(data.materials) ? data.materials : [];
+  data.materials = data.materials
+    .map((material) => ({
+      id: normalizeText(material.id) || crypto.randomBytes(4).toString("hex"),
+      className: normalizeClassName(material.className),
+      title: normalizeText(material.title),
+      fileName: normalizeText(material.fileName),
+      mimeType: normalizeText(material.mimeType) || "application/pdf",
+      driveFileId: normalizeText(material.driveFileId),
+      previewUrl: normalizeText(material.previewUrl),
+      viewUrl: normalizeText(material.viewUrl || material.previewUrl),
+      downloadRestricted: material.downloadRestricted !== false,
+      createdAt: material.createdAt || new Date().toISOString(),
+    }))
+    .filter((material) => material.title && material.previewUrl);
   return data;
+}
+
+function publicMaterial(material) {
+  return {
+    id: material.id,
+    className: material.className,
+    title: material.title,
+    fileName: material.fileName,
+    mimeType: material.mimeType,
+    previewUrl: material.previewUrl,
+    viewUrl: material.viewUrl,
+    downloadRestricted: material.downloadRestricted,
+    createdAt: material.createdAt,
+  };
 }
 
 function publicAssignment(assignment) {
@@ -1103,6 +1133,125 @@ async function handleApi(req, res, pathname) {
 
   const data = normalizeData(await store.read());
 
+  const localMaterialMatch = pathname.match(/^\/api\/material-content\/([^/]+)$/);
+  if (req.method === "GET" && localMaterialMatch && store.kind === "local-json") {
+    const safeName = path.basename(decodeURIComponent(localMaterialMatch[1]));
+    const target = path.join(`${path.join(ROOT, "data.json")}.materials`, safeName);
+    if (!fs.existsSync(target)) {
+      sendJson(res, 404, { error: "자료를 찾을 수 없습니다." });
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline",
+      "Cache-Control": "private, max-age=300",
+    });
+    fs.createReadStream(target).pipe(res);
+    return;
+  }
+
+  const classMaterialsMatch = pathname.match(/^\/api\/classes\/([^/]+)\/materials$/);
+  if (req.method === "GET" && classMaterialsMatch) {
+    const className = normalizeClassName(decodeURIComponent(classMaterialsMatch[1]));
+    sendJson(res, 200, {
+      className,
+      materials: data.materials
+        .filter((material) => material.className === className)
+        .slice()
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(publicMaterial),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/student/materials") {
+    const session = studentSession(req, data);
+    if (!session) {
+      sendJson(res, 401, { error: "로그인이 필요합니다." });
+      return;
+    }
+    sendJson(res, 200, {
+      className: session.className,
+      materials: data.materials
+        .filter((material) => material.className === session.className)
+        .slice()
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(publicMaterial),
+    });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/materials") {
+    const body = await readBody(req);
+    const className = normalizeClassName(body.className);
+    const classInfo = classInfoFor(data, className);
+    const title = normalizeText(body.title);
+    const file = body.file && typeof body.file === "object" ? body.file : {};
+    const fileName = normalizeText(file.name);
+    const mimeType = normalizeText(file.mimeType).toLowerCase();
+    const base64 = normalizeText(file.base64);
+    const pdfFile = mimeType === "application/pdf" || /\.pdf$/i.test(fileName);
+    const fileSize = base64 ? Buffer.byteLength(base64, "base64") : 0;
+
+    if (!classInfo) {
+      sendJson(res, 404, { error: "등록할 반을 찾을 수 없습니다." });
+      return;
+    }
+    if (!title || !fileName || !base64 || !pdfFile) {
+      sendJson(res, 400, { error: "자료명과 PDF 파일을 확인해 주세요." });
+      return;
+    }
+    if (fileSize > MATERIAL_MAX_BYTES) {
+      sendJson(res, 413, { error: "PDF 파일은 15MB 이하로 올려 주세요." });
+      return;
+    }
+
+    const uploaded = await store.uploadMaterial(classInfo.name, {
+      name: fileName,
+      mimeType: "application/pdf",
+      base64,
+    });
+    const material = {
+      id: crypto.randomBytes(4).toString("hex"),
+      className: classInfo.name,
+      title,
+      fileName,
+      mimeType: "application/pdf",
+      driveFileId: normalizeText(uploaded && uploaded.driveFileId),
+      previewUrl: normalizeText(uploaded && uploaded.previewUrl),
+      viewUrl: normalizeText(uploaded && uploaded.viewUrl),
+      downloadRestricted: uploaded ? uploaded.downloadRestricted !== false : true,
+      createdAt: new Date().toISOString(),
+    };
+    if (!material.previewUrl) {
+      sendJson(res, 502, { error: "Google Drive에 자료를 저장하지 못했습니다." });
+      return;
+    }
+    data.materials.push(material);
+    try {
+      await store.write(data);
+    } catch (error) {
+      await store.deleteMaterial(material.driveFileId).catch(() => {});
+      throw error;
+    }
+    sendJson(res, 201, publicMaterial(material));
+    return;
+  }
+
+  const materialMatch = pathname.match(/^\/api\/materials\/([^/]+)$/);
+  if (req.method === "DELETE" && materialMatch) {
+    const materialIndex = data.materials.findIndex((material) => material.id === materialMatch[1]);
+    if (materialIndex < 0) {
+      sendJson(res, 404, { error: "삭제할 자료를 찾을 수 없습니다." });
+      return;
+    }
+    const [material] = data.materials.splice(materialIndex, 1);
+    await store.deleteMaterial(material.driveFileId);
+    await store.write(data);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   if (req.method === "POST" && pathname === "/api/student/login") {
     const body = await readBody(req);
     const className = normalizeClassName(body.className);
@@ -1389,6 +1538,9 @@ async function handleApi(req, res, pathname) {
       ),
       monthlyLearningAnalyses: data.monthlyLearningAnalyses.filter(
         (analysis) => analysis.className === classInfo.name && analysis.month === month,
+      ),
+      materials: data.materials.filter(
+        (material) => material.className === classInfo.name && material.createdAt.startsWith(month),
       ),
     };
     sendJson(res, 200, backup, {

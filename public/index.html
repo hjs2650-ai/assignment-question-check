@@ -27,6 +27,7 @@
         <button class="teacher-main-tab is-active" type="button" data-module="assignments" aria-selected="true">과제</button>
         <button class="teacher-main-tab" type="button" data-module="attendance" aria-selected="false">출결</button>
         <button class="teacher-main-tab" type="button" data-module="tests" aria-selected="false">테스트</button>
+        <button class="teacher-main-tab" type="button" data-module="materials" aria-selected="false">학습자료</button>
         <button class="teacher-main-tab" type="button" data-module="monthly" aria-selected="false">월간 리포트</button>
       </nav>
 
@@ -124,6 +125,33 @@
         <span id="assignmentCount" class="visually-hidden">0개</span>
       </section>
       </div>
+
+      <section id="materialsManagementModule" class="panel teacher-module" hidden>
+        <div class="management-module-head">
+          <div>
+            <p class="eyebrow">학생 화면에 바로 공개</p>
+            <h2>학습자료 관리</h2>
+          </div>
+          <span id="materialClassLabel" class="badge">반 선택</span>
+        </div>
+        <form id="materialUploadForm" class="material-upload-form">
+          <label>
+            자료명
+            <input id="materialTitle" placeholder="예: 집합과 명제 보충문제" required />
+          </label>
+          <label>
+            PDF 파일
+            <input id="materialFile" type="file" accept="application/pdf,.pdf" required />
+          </label>
+          <button id="materialUploadButton" class="primary" type="submit">자료 등록</button>
+        </form>
+        <p id="materialMessage" class="message"></p>
+        <div class="material-list-head">
+          <h3>등록된 자료</h3>
+          <span id="teacherMaterialCount" class="badge">0개</span>
+        </div>
+        <div id="teacherMaterialList" class="teacher-material-list"></div>
+      </section>
 
       <section id="attendanceManagementModule" class="panel teacher-module" hidden>
         <div class="management-module-head">

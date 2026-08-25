@@ -164,6 +164,25 @@
         </section>
       </section>
 
+      <section id="studentMaterialsView" class="student-main-view" hidden>
+        <section class="panel student-materials-panel">
+          <div class="student-materials-head">
+            <div>
+              <p class="eyebrow">수업 자료 모아보기</p>
+              <h2>학습자료</h2>
+            </div>
+            <span id="studentMaterialCount" class="badge">0개</span>
+          </div>
+          <div id="studentMaterialsWorkspace" class="student-materials-workspace" hidden>
+            <div id="studentMaterialList" class="student-material-list"></div>
+          </div>
+          <div id="studentMaterialsEmpty" class="student-empty-state">
+            <strong>등록된 학습자료가 아직 없어요.</strong>
+          </div>
+          <p id="studentMaterialsMessage" class="message"></p>
+        </section>
+      </section>
+
       <section id="studentAssignmentView" class="student-main-view" hidden>
       <section class="student-assignment-context">
         <span>이번 과제</span>
@@ -335,9 +354,18 @@
         <button class="student-main-tab is-active" type="button" data-view="home" aria-selected="true">홈</button>
         <button class="student-main-tab" type="button" data-view="assignment" aria-selected="false">과제</button>
         <button class="student-main-tab" type="button" data-view="videos" aria-selected="false">수업영상</button>
+        <button class="student-main-tab" type="button" data-view="materials" aria-selected="false">학습자료</button>
         <button class="student-main-tab" type="button" data-view="records" aria-selected="false">내 기록</button>
       </nav>
     </main>
+
+    <section id="studentMaterialFullscreen" class="student-material-fullscreen" hidden aria-label="학습자료 전체화면">
+      <header class="student-material-fullscreen-head">
+        <strong id="studentMaterialViewerTitle">학습자료</strong>
+        <button id="studentMaterialClose" type="button" aria-label="학습자료 닫기" title="닫기">&times;</button>
+      </header>
+      <iframe id="studentMaterialFrame" title="학습자료 열람"></iframe>
+    </section>
 
     <script src="/student.js"></script>
   </body>
