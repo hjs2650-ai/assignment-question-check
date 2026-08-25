@@ -1311,7 +1311,7 @@ summary {
 
 .photo-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1334,6 +1334,12 @@ summary {
   border-color: rgba(15, 143, 122, 0.28);
   background: #e9f8f4;
   color: var(--accent);
+}
+
+.photo-picker.video-camera {
+  border-color: rgba(72, 104, 184, 0.28);
+  background: #eef2ff;
+  color: #4868b8;
 }
 
 .photo-picker input {
@@ -3564,6 +3570,12 @@ body[data-theme="night"] .range-text {
   border-color: #b9d9c8;
   background: #edf8f2;
   color: #3d7b5b;
+}
+
+.student-app-body .photo-picker.video-camera {
+  border-color: #c9d2ec;
+  background: #f2f5ff;
+  color: #526ba7;
 }
 
 .student-app-body .student-missing-check,

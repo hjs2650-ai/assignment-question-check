@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>과제 클리어체크</title>
-    <meta name="description" content="도와줘요 쌤 문제를 체크하고 과제 사진을 첨부해 주세요." />
+    <meta name="description" content="도와줘요 쌤 문제를 체크하고 과제 사진이나 동영상을 첨부해 주세요." />
     <meta property="og:title" content="과제 클리어체크" />
-    <meta property="og:description" content="도와줘요 쌤 문제를 체크하고 과제 사진을 첨부해 주세요." />
+    <meta property="og:description" content="도와줘요 쌤 문제를 체크하고 과제 사진이나 동영상을 첨부해 주세요." />
     <meta property="og:image" content="/assets/teacher-character.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="과제 클리어체크" />
-    <meta name="twitter:description" content="도와줘요 쌤 문제를 체크하고 과제 사진을 첨부해 주세요." />
+    <meta name="twitter:description" content="도와줘요 쌤 문제를 체크하고 과제 사진이나 동영상을 첨부해 주세요." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
@@ -235,15 +235,19 @@
               </span>
             </label>
             <div class="photo-upload">
-              <strong>과제 사진 첨부</strong>
+              <strong>과제 사진·동영상 첨부</strong>
               <div class="photo-actions">
                 <label class="photo-picker">
-                  앨범에서 여러 장 선택
-                  <input id="photoFiles" type="file" accept="image/*" multiple />
+                  사진·동영상 선택
+                  <input id="photoFiles" type="file" accept="image/*,video/*" multiple />
                 </label>
                 <label class="photo-picker camera">
                   카메라로 사진 추가
                   <input id="photoCamera" type="file" accept="image/*" capture="environment" />
+                </label>
+                <label class="photo-picker video-camera">
+                  동영상 촬영
+                  <input id="videoCamera" type="file" accept="video/*" capture="environment" />
                 </label>
               </div>
               <span class="muted">카메라로 찍은 사진도 계속 추가할 수 있습니다.</span>
@@ -276,15 +280,19 @@
               </label>
             </section>
             <div class="photo-upload">
-              <strong>지난과제 사진 첨부 <small>(선택)</small></strong>
+              <strong>지난과제 사진·동영상 첨부 <small>(선택)</small></strong>
               <div class="photo-actions">
                 <label class="photo-picker">
-                  앨범에서 여러 장 선택
-                  <input id="pastPhotoFiles" type="file" accept="image/*" multiple />
+                  사진·동영상 선택
+                  <input id="pastPhotoFiles" type="file" accept="image/*,video/*" multiple />
                 </label>
                 <label class="photo-picker camera">
                   카메라로 사진 추가
                   <input id="pastPhotoCamera" type="file" accept="image/*" capture="environment" />
+                </label>
+                <label class="photo-picker video-camera">
+                  동영상 촬영
+                  <input id="pastVideoCamera" type="file" accept="video/*" capture="environment" />
                 </label>
               </div>
               <span class="muted">질문할 문제를 체크했다면 사진 없이도 저장할 수 있습니다.</span>

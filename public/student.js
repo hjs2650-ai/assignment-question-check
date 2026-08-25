@@ -16,6 +16,7 @@ const noQuestionInput = document.querySelector("#noQuestion");
 const message = document.querySelector("#message");
 const photoInput = document.querySelector("#photoFiles");
 const photoCameraInput = document.querySelector("#photoCamera");
+const videoCameraInput = document.querySelector("#videoCamera");
 const photoList = document.querySelector("#photoList");
 const submissionTabs = document.querySelector("#submissionTabs");
 const currentSubmissionTab = document.querySelector("#currentSubmissionTab");
@@ -29,6 +30,7 @@ const pastCheckedCount = document.querySelector("#pastCheckedCount");
 const pastNoQuestionInput = document.querySelector("#pastNoQuestion");
 const pastPhotoInput = document.querySelector("#pastPhotoFiles");
 const pastPhotoCameraInput = document.querySelector("#pastPhotoCamera");
+const pastVideoCameraInput = document.querySelector("#pastVideoCamera");
 const pastPhotoList = document.querySelector("#pastPhotoList");
 const pastSubmitBtn = document.querySelector("#pastSubmitBtn");
 const pastMessage = document.querySelector("#pastMessage");
@@ -848,7 +850,7 @@ function renderStudentMissingAssignments(assignments) {
         ? `
           <div class="student-missing-title">
             <strong>미제출 지난 과제 ${missing.length}건</strong>
-            <span>완료한 과제는 사진을 첨부해 제출해 주세요.</span>
+            <span>완료한 과제는 사진이나 동영상을 첨부해 제출해 주세요.</span>
           </div>
           <div class="student-missing-items">
             ${missing
@@ -964,8 +966,12 @@ function fileKey(file) {
   return [file.name, file.size, file.lastModified].join(":");
 }
 
-function isImageFile(file) {
-  return file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+function isSubmissionFile(file) {
+  return (
+    file.type.startsWith("image/") ||
+    file.type.startsWith("video/") ||
+    /\.(jpe?g|png|webp|heic|heif|mp4|mov|m4v|webm|avi)$/i.test(file.name)
+  );
 }
 
 function renderSelectedPhotos(files, list) {
@@ -976,7 +982,7 @@ function renderSelectedPhotos(files, list) {
 
 function addSelectedPhotos(input, selectedFiles, list) {
   const existingKeys = new Set(selectedFiles.map(fileKey));
-  const incomingFiles = [...input.files].filter(isImageFile);
+  const incomingFiles = [...input.files].filter(isSubmissionFile);
 
   for (const file of incomingFiles) {
     const key = fileKey(file);
@@ -991,10 +997,10 @@ function addSelectedPhotos(input, selectedFiles, list) {
 }
 
 async function selectedPhotosPayload(files) {
-  const selectedFiles = files.filter(isImageFile);
+  const selectedFiles = files.filter(isSubmissionFile);
   return selectedFiles.map((file) => ({
     name: file.name,
-    mimeType: file.type.startsWith("image/") ? file.type : "image/jpeg",
+    mimeType: file.type || (/\.(mp4|mov|m4v|webm|avi)$/i.test(file.name) ? "video/mp4" : "image/jpeg"),
   }));
 }
 
@@ -1007,7 +1013,7 @@ function showAssignment(assignment) {
   classNameEl.textContent = `${displayDateLabel(assignment.dateLabel)} 과제`;
   title.textContent = assignmentTitle;
   rangeText.textContent = assignmentRange;
-  detail.textContent = "질문하고 싶은 문제들을 체크하고, 과제 사진은 첨부해 주세요.";
+  detail.textContent = "질문하고 싶은 문제들을 체크하고, 과제 사진이나 동영상은 첨부해 주세요.";
   assignmentViewTitle.textContent = assignmentTitle;
   assignmentViewRange.textContent = assignmentRange;
   renderProblems(assignment);
@@ -1102,7 +1108,7 @@ form.addEventListener("submit", async (event) => {
   const files = await selectedPhotosPayload(currentPhotoFiles);
   if (!files.length) {
     message.className = "message error";
-    message.textContent = "과제 사진을 한 장 이상 첨부해 주세요.";
+    message.textContent = "과제 사진이나 동영상을 한 개 이상 첨부해 주세요.";
     return;
   }
 
@@ -1142,9 +1148,10 @@ form.addEventListener("submit", async (event) => {
     currentPhotoFiles = [];
     photoInput.value = "";
     photoCameraInput.value = "";
+    videoCameraInput.value = "";
     renderSelectedPhotos(currentPhotoFiles, photoList);
     message.className = "message success";
-    message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 사진 첨부 여부가 수정됩니다.</span>";
+    message.innerHTML = "<strong>제출 완료되었습니다.</strong><span>같은 이름으로 다시 제출하면 체크 내용과 첨부 여부가 수정됩니다.</span>";
     recordsLoadedForMonth = "";
     await Promise.allSettled([loadStudentRecords(true), loadStudentHomeStatus()]);
   } catch (error) {
@@ -1181,7 +1188,7 @@ async function submitPastAssignment() {
 
   if (!files.length && !problems.length) {
     pastMessage.className = "message error";
-    pastMessage.textContent = "질문할 문제를 선택하거나 지난과제 사진을 첨부해 주세요.";
+    pastMessage.textContent = "질문할 문제를 선택하거나 지난과제 사진·동영상을 첨부해 주세요.";
     return;
   }
 
@@ -1222,6 +1229,7 @@ async function submitPastAssignment() {
     pastPhotoFiles = [];
     pastPhotoInput.value = "";
     pastPhotoCameraInput.value = "";
+    pastVideoCameraInput.value = "";
     renderSelectedPhotos(pastPhotoFiles, pastPhotoList);
     pastMessage.className = "message success";
     pastMessage.innerHTML = `<strong>지난과제 제출 완료되었습니다.</strong><span>${escapeHtml(selected?.dateLabel || "선택한 날짜")} 과제 제출로 기록되었습니다.</span>`;
@@ -1234,8 +1242,10 @@ async function submitPastAssignment() {
 
 photoInput.addEventListener("change", () => addSelectedPhotos(photoInput, currentPhotoFiles, photoList));
 photoCameraInput.addEventListener("change", () => addSelectedPhotos(photoCameraInput, currentPhotoFiles, photoList));
+videoCameraInput.addEventListener("change", () => addSelectedPhotos(videoCameraInput, currentPhotoFiles, photoList));
 pastPhotoInput.addEventListener("change", () => addSelectedPhotos(pastPhotoInput, pastPhotoFiles, pastPhotoList));
 pastPhotoCameraInput.addEventListener("change", () => addSelectedPhotos(pastPhotoCameraInput, pastPhotoFiles, pastPhotoList));
+pastVideoCameraInput.addEventListener("change", () => addSelectedPhotos(pastVideoCameraInput, pastPhotoFiles, pastPhotoList));
 currentSubmissionTab.addEventListener("click", () => setSubmissionMode("current"));
 pastSubmissionTab.addEventListener("click", () => setSubmissionMode("past"));
 grid.addEventListener("change", (event) => {

@@ -1957,7 +1957,7 @@ async function handleApi(req, res, pathname) {
     const problems = [...new Set(checked)].filter((problem) => validSet.has(problem));
     const latestAssignment = latestAssignmentForClass(data, assignment.className, studentName);
     const isPastAssignment = Boolean(latestAssignment && latestAssignment.id !== assignment.id);
-    const hasSubmittedPhoto = submittedFiles.some((file) => file && /^image\//.test(file.mimeType));
+    const hasSubmittedFile = submittedFiles.some((file) => file && /^(image|video)\//.test(file.mimeType));
 
     if (!studentName) {
       sendJson(res, 400, { error: "이름을 입력해 주세요." });
@@ -1985,15 +1985,15 @@ async function handleApi(req, res, pathname) {
       return;
     }
 
-    if (!hasSubmittedPhoto && !(isPastAssignment && problems.length > 0)) {
-      sendJson(res, 400, { error: "과제 사진을 한 장 이상 첨부해 주세요." });
+    if (!hasSubmittedFile && !(isPastAssignment && problems.length > 0)) {
+      sendJson(res, 400, { error: "과제 사진이나 동영상을 한 개 이상 첨부해 주세요." });
       return;
     }
 
     const uploadedFiles = submittedFiles
-      .filter((file) => file && /^image\//.test(file.mimeType))
+      .filter((file) => file && /^(image|video)\//.test(file.mimeType))
       .map((file) => ({
-        name: normalizeText(file.name) || "photo",
+        name: normalizeText(file.name) || "attachment",
         stored: false,
         createdAt: new Date().toISOString(),
       }));
