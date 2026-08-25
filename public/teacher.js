@@ -426,13 +426,43 @@ async function loadMaterials() {
   renderTeacherMaterials();
 }
 
-function fileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(String(reader.result || "").split(",").pop() || ""));
-    reader.addEventListener("error", () => reject(new Error("PDF 파일을 읽지 못했습니다.")));
-    reader.readAsDataURL(file);
+async function uploadMaterialInChunks(file, title) {
+  const upload = await api("/api/materials/uploads", {
+    method: "POST",
+    body: JSON.stringify({
+      className: selectedClassName,
+      title,
+      file: {
+        name: file.name,
+        mimeType: file.type || "application/pdf",
+        size: file.size,
+      },
+    }),
   });
+  const chunkSize = Number(upload.chunkSize) || 5 * 1024 * 1024;
+  let offset = 0;
+  let completedMaterial = null;
+
+  while (offset < file.size) {
+    const endExclusive = Math.min(offset + chunkSize, file.size);
+    const response = await fetch(`/api/materials/uploads/${encodeURIComponent(upload.uploadId)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Range": `bytes ${offset}-${endExclusive - 1}/${file.size}`,
+      },
+      body: file.slice(offset, endExclusive),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || "PDF 파일을 올리지 못했습니다.");
+    }
+    offset = Number(payload.nextOffset) || endExclusive;
+    completedMaterial = payload.material || completedMaterial;
+    const percent = Math.min(100, Math.round((offset / file.size) * 100));
+    materialMessage.textContent = `Google Drive에 자료를 등록하는 중입니다. ${percent}%`;
+  }
+  return completedMaterial;
 }
 
 function attendanceDateSummary(row) {
@@ -1569,28 +1599,16 @@ materialUploadForm.addEventListener("submit", async (event) => {
     materialMessage.textContent = "PDF 파일을 선택해 주세요.";
     return;
   }
-  if (file.size > 15 * 1024 * 1024) {
+  if (file.size > 500 * 1024 * 1024) {
     materialMessage.className = "message error";
-    materialMessage.textContent = "PDF 파일은 15MB 이하로 올려 주세요.";
+    materialMessage.textContent = "PDF 파일은 500MB 이하로 올려 주세요.";
     return;
   }
 
   materialUploadButton.disabled = true;
   materialMessage.textContent = "Google Drive에 자료를 등록하는 중입니다.";
   try {
-    const base64 = await fileAsBase64(file);
-    await api("/api/materials", {
-      method: "POST",
-      body: JSON.stringify({
-        className: selectedClassName,
-        title: materialTitle.value.trim(),
-        file: {
-          name: file.name,
-          mimeType: file.type || "application/pdf",
-          base64,
-        },
-      }),
-    });
+    await uploadMaterialInChunks(file, materialTitle.value.trim());
     materialUploadForm.reset();
     materialMessage.className = "message success";
     materialMessage.textContent = "학생 화면에 학습자료를 등록했습니다.";

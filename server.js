@@ -14,7 +14,10 @@ const YOUTUBE_OAUTH_CLIENT_ID = process.env.YOUTUBE_OAUTH_CLIENT_ID || "";
 const YOUTUBE_OAUTH_CLIENT_SECRET = process.env.YOUTUBE_OAUTH_CLIENT_SECRET || "";
 const YOUTUBE_OAUTH_REFRESH_TOKEN = process.env.YOUTUBE_OAUTH_REFRESH_TOKEN || "";
 const YOUTUBE_CACHE_MS = 15 * 60 * 1000;
-const MATERIAL_MAX_BYTES = 15 * 1024 * 1024;
+const MATERIAL_LEGACY_MAX_BYTES = 32 * 1024 * 1024;
+const MATERIAL_MAX_BYTES = 500 * 1024 * 1024;
+const MATERIAL_CHUNK_BYTES = 5 * 1024 * 1024;
+const MATERIAL_UPLOAD_TTL_MS = 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.SHEETS_SECRET || crypto.randomBytes(32).toString("hex");
 const SESSION_COOKIE = "hwangt_student_session";
 const SESSION_TTL_SECONDS = 365 * 24 * 60 * 60;
@@ -61,6 +64,7 @@ const ATTENDANCE_STATUSES = new Set(["present", "late", "absent", "early", "make
 let youtubeCache = { expiresAt: 0, videos: [] };
 let youtubeUploadsPlaylistId = "";
 let youtubeAccessTokenCache = { expiresAt: 0, token: "" };
+const materialUploadSessions = new Map();
 const MANUAL_YOUTUBE_VIDEOS = [
   {
     id: "-uHifP-KULc",
@@ -112,7 +116,7 @@ function readBody(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 25_000_000) {
+      if (body.length > 46_000_000) {
         reject(new Error("Body too large"));
         req.destroy();
       }
@@ -124,6 +128,33 @@ function readBody(req) {
         reject(error);
       }
     });
+  });
+}
+
+function readRawBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let length = 0;
+    req.on("data", (chunk) => {
+      length += chunk.length;
+      if (length > maxBytes) {
+        reject(new Error("Upload chunk too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks, length)));
+    req.on("error", reject);
+  });
+}
+
+function pruneMaterialUploadSessions() {
+  const cutoff = Date.now() - MATERIAL_UPLOAD_TTL_MS;
+  materialUploadSessions.forEach((session, uploadId) => {
+    if (session.createdAt < cutoff) {
+      materialUploadSessions.delete(uploadId);
+    }
   });
 }
 
@@ -1181,6 +1212,120 @@ async function handleApi(req, res, pathname) {
     return;
   }
 
+  if (req.method === "POST" && pathname === "/api/materials/uploads") {
+    const body = await readBody(req);
+    const className = normalizeClassName(body.className);
+    const classInfo = classInfoFor(data, className);
+    const title = normalizeText(body.title);
+    const file = body.file && typeof body.file === "object" ? body.file : {};
+    const fileName = normalizeText(file.name);
+    const mimeType = normalizeText(file.mimeType).toLowerCase();
+    const fileSize = Number(file.size || 0);
+    const pdfFile = mimeType === "application/pdf" || /\.pdf$/i.test(fileName);
+
+    if (!classInfo) {
+      sendJson(res, 404, { error: "등록할 반을 찾을 수 없습니다." });
+      return;
+    }
+    if (!title || !fileName || !pdfFile || !Number.isSafeInteger(fileSize) || fileSize <= 0) {
+      sendJson(res, 400, { error: "자료명과 PDF 파일을 확인해 주세요." });
+      return;
+    }
+    if (fileSize > MATERIAL_MAX_BYTES) {
+      sendJson(res, 413, { error: "PDF 파일은 500MB 이하로 올려 주세요." });
+      return;
+    }
+
+    pruneMaterialUploadSessions();
+    const backend = await store.startMaterialUpload(classInfo.name, {
+      name: fileName,
+      mimeType: "application/pdf",
+      size: fileSize,
+    });
+    const uploadId = crypto.randomBytes(18).toString("hex");
+    materialUploadSessions.set(uploadId, {
+      backend,
+      className: classInfo.name,
+      title,
+      fileName,
+      fileSize,
+      nextOffset: 0,
+      createdAt: Date.now(),
+      completedFileId: "",
+    });
+    sendJson(res, 201, { uploadId, chunkSize: MATERIAL_CHUNK_BYTES });
+    return;
+  }
+
+  const materialUploadMatch = pathname.match(/^\/api\/materials\/uploads\/([a-f0-9]+)$/);
+  if (req.method === "PUT" && materialUploadMatch) {
+    const uploadId = materialUploadMatch[1];
+    const session = materialUploadSessions.get(uploadId);
+    if (!session || Date.now() - session.createdAt > MATERIAL_UPLOAD_TTL_MS) {
+      materialUploadSessions.delete(uploadId);
+      sendJson(res, 410, { error: "업로드 시간이 만료되었습니다. 다시 시도해 주세요." });
+      return;
+    }
+
+    const range = String(req.headers["content-range"] || "").match(/^bytes (\d+)-(\d+)\/(\d+)$/i);
+    if (!range) {
+      sendJson(res, 400, { error: "파일 조각 범위를 확인할 수 없습니다." });
+      return;
+    }
+    const start = Number(range[1]);
+    const end = Number(range[2]);
+    const total = Number(range[3]);
+    if (total !== session.fileSize || start !== session.nextOffset || end < start) {
+      sendJson(res, 409, { error: "파일 조각 순서가 맞지 않습니다. 다시 등록해 주세요." });
+      return;
+    }
+    const chunk = await readRawBody(req, MATERIAL_CHUNK_BYTES + 1024);
+    if (chunk.length !== end - start + 1 || chunk.length > MATERIAL_CHUNK_BYTES) {
+      sendJson(res, 400, { error: "파일 조각 크기가 올바르지 않습니다." });
+      return;
+    }
+
+    let uploadedChunk = { done: true, nextOffset: total, fileId: session.completedFileId };
+    if (!session.completedFileId) {
+      uploadedChunk = await store.uploadMaterialChunk(session.backend, chunk, start, end, total);
+      session.nextOffset = uploadedChunk.nextOffset;
+      session.completedFileId = normalizeText(uploadedChunk.fileId);
+    }
+    if (!uploadedChunk.done) {
+      sendJson(res, 200, { done: false, nextOffset: session.nextOffset });
+      return;
+    }
+
+    const uploaded = await store.finishMaterialUpload(session.backend, session.completedFileId);
+    const material = {
+      id: crypto.randomBytes(4).toString("hex"),
+      className: session.className,
+      title: session.title,
+      fileName: session.fileName,
+      mimeType: "application/pdf",
+      driveFileId: normalizeText(uploaded && uploaded.driveFileId),
+      previewUrl: normalizeText(uploaded && uploaded.previewUrl),
+      viewUrl: normalizeText(uploaded && uploaded.viewUrl),
+      downloadRestricted: uploaded ? uploaded.downloadRestricted !== false : true,
+      createdAt: new Date().toISOString(),
+    };
+    if (!material.previewUrl) {
+      sendJson(res, 502, { error: "Google Drive에 자료를 저장하지 못했습니다." });
+      return;
+    }
+    data.materials.push(material);
+    try {
+      await store.write(data);
+    } catch (error) {
+      await store.deleteMaterial(material.driveFileId).catch(() => {});
+      throw error;
+    } finally {
+      materialUploadSessions.delete(uploadId);
+    }
+    sendJson(res, 201, { done: true, nextOffset: total, material: publicMaterial(material) });
+    return;
+  }
+
   if (req.method === "POST" && pathname === "/api/materials") {
     const body = await readBody(req);
     const className = normalizeClassName(body.className);
@@ -1201,8 +1346,8 @@ async function handleApi(req, res, pathname) {
       sendJson(res, 400, { error: "자료명과 PDF 파일을 확인해 주세요." });
       return;
     }
-    if (fileSize > MATERIAL_MAX_BYTES) {
-      sendJson(res, 413, { error: "PDF 파일은 15MB 이하로 올려 주세요." });
+    if (fileSize > MATERIAL_LEGACY_MAX_BYTES) {
+      sendJson(res, 413, { error: "PDF 파일은 32MB 이하로 올려 주세요." });
       return;
     }
 

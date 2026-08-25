@@ -32,6 +32,8 @@ function compactData(data) {
 }
 
 function createLocalStore(localFile) {
+  const materialUploads = new Map();
+
   return {
     kind: "local-json",
     async read() {
@@ -76,6 +78,44 @@ function createLocalStore(localFile) {
         driveFileId: `local:${safeName}`,
         previewUrl: `/api/material-content/${encodeURIComponent(safeName)}`,
         viewUrl: `/api/material-content/${encodeURIComponent(safeName)}`,
+        downloadRestricted: true,
+      };
+    },
+    async startMaterialUpload(className, file) {
+      const uploadDir = `${localFile}.materials`;
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const safeName = `${Date.now()}-${String(file.name || "material.pdf").replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+      const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const target = `${uploadDir}/${safeName}`;
+      fs.writeFileSync(target, Buffer.alloc(0));
+      materialUploads.set(uploadId, { target, safeName });
+      return { uploadId };
+    },
+    async uploadMaterialChunk(upload, chunk, start, end, total) {
+      const session = materialUploads.get(upload.uploadId);
+      if (!session) {
+        throw new Error("업로드 시간이 만료되었습니다. 다시 시도해 주세요.");
+      }
+      const handle = fs.openSync(session.target, "r+");
+      try {
+        fs.writeSync(handle, chunk, 0, chunk.length, start);
+      } finally {
+        fs.closeSync(handle);
+      }
+      return { done: end + 1 >= total, nextOffset: end + 1 };
+    },
+    async finishMaterialUpload(upload) {
+      const session = materialUploads.get(upload.uploadId);
+      if (!session) {
+        throw new Error("업로드 시간이 만료되었습니다. 다시 시도해 주세요.");
+      }
+      materialUploads.delete(upload.uploadId);
+      return {
+        driveFileId: `local:${session.safeName}`,
+        previewUrl: `/api/material-content/${encodeURIComponent(session.safeName)}`,
+        viewUrl: `/api/material-content/${encodeURIComponent(session.safeName)}`,
         downloadRestricted: true,
       };
     },
@@ -172,6 +212,36 @@ function createSheetsStore(sheetsUrl, sheetsSecret, fallbackStore) {
         className,
         file,
       });
+      return payload.file;
+    },
+    async startMaterialUpload(className, file) {
+      const payload = await request("startMaterialUpload", { className, file });
+      return payload.upload;
+    },
+    async uploadMaterialChunk(upload, chunk, start, end, total) {
+      const response = await fetch(upload.sessionUrl, {
+        method: "PUT",
+        redirect: "manual",
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Length": String(chunk.length),
+          "Content-Range": `bytes ${start}-${end}/${total}`,
+        },
+        body: chunk,
+      });
+      if (response.status === 308) {
+        const range = response.headers.get("range") || "";
+        const match = range.match(/bytes=0-(\d+)/i);
+        return { done: false, nextOffset: match ? Number(match[1]) + 1 : end + 1 };
+      }
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.id) {
+        throw new Error(payload.error?.message || "Google Drive에 파일 조각을 저장하지 못했습니다.");
+      }
+      return { done: true, nextOffset: total, fileId: payload.id };
+    },
+    async finishMaterialUpload(upload, fileId) {
+      const payload = await request("finishMaterialUpload", { fileId });
       return payload.file;
     },
     async deleteMaterial(fileId) {
