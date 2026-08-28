@@ -464,6 +464,33 @@ function wrongAnswerQuestions(studentName) {
   };
 }
 
+function updateWrongAnswerExtractorLink(card) {
+  const link = card.querySelector(".open-wrong-answer-extractor");
+  const numbers = [...card.querySelectorAll('input[type="checkbox"]:checked')]
+    .map((box) => Number(box.value))
+    .sort((a, b) => a - b);
+  if (!numbers.length) {
+    link.href = "#";
+    link.setAttribute("aria-disabled", "true");
+    return [];
+  }
+
+  const book = extractorBooks[link.dataset.bookId];
+  let mode = wrongAnswerOutputMode.value;
+  if (book.variants === 1 && mode === "variant2") {
+    mode = "variant1";
+  }
+  const params = new URLSearchParams({
+    student: selectedWrongAnswerStudent,
+    book: link.dataset.bookId,
+    numbers: numbers.join(","),
+    mode,
+  });
+  link.href = `hwang-extractor://open?${params.toString()}`;
+  link.removeAttribute("aria-disabled");
+  return numbers;
+}
+
 function bindWrongAnswerActions() {
   wrongAnswerQuestionList.querySelectorAll(".wrong-answer-toggle-all").forEach((button) => {
     button.addEventListener("click", () => {
@@ -472,34 +499,26 @@ function bindWrongAnswerActions() {
       const shouldCheck = boxes.some((box) => !box.checked);
       boxes.forEach((box) => { box.checked = shouldCheck; });
       button.textContent = shouldCheck ? "전체 해제" : "전체 선택";
+      updateWrongAnswerExtractorLink(card);
     });
   });
 
-  wrongAnswerQuestionList.querySelectorAll(".open-wrong-answer-extractor").forEach((button) => {
-    button.addEventListener("click", () => {
-      const card = button.closest(".wrong-answer-book-card");
-      const numbers = [...card.querySelectorAll('input[type="checkbox"]:checked')]
-        .map((box) => Number(box.value))
-        .sort((a, b) => a - b);
+  wrongAnswerQuestionList.querySelectorAll(".wrong-answer-book-card").forEach((card) => {
+    card.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+      box.addEventListener("change", () => updateWrongAnswerExtractorLink(card));
+    });
+    const link = card.querySelector(".open-wrong-answer-extractor");
+    updateWrongAnswerExtractorLink(card);
+    link.addEventListener("click", (event) => {
+      const numbers = updateWrongAnswerExtractorLink(card);
       if (!numbers.length) {
+        event.preventDefault();
         wrongAnswerMessage.className = "message error";
         wrongAnswerMessage.textContent = "추출할 문항을 하나 이상 선택해 주세요.";
         return;
       }
-      const book = extractorBooks[button.dataset.bookId];
-      let mode = wrongAnswerOutputMode.value;
-      if (book.variants === 1 && mode === "variant2") {
-        mode = "variant1";
-      }
-      const params = new URLSearchParams({
-        student: selectedWrongAnswerStudent,
-        book: button.dataset.bookId,
-        numbers: numbers.join(","),
-        mode,
-      });
       wrongAnswerMessage.className = "message success";
       wrongAnswerMessage.textContent = "오답문항추출기를 여는 중입니다. 브라우저 확인창이 나오면 열기를 눌러 주세요.";
-      window.location.href = `hwang-extractor://open?${params.toString()}`;
     });
   });
 }
@@ -545,9 +564,9 @@ function renderWrongAnswerExtractor() {
             </label>
           `).join("")}
         </div>
-        <button class="primary open-wrong-answer-extractor" type="button" data-book-id="${bookId}">
+        <a class="primary open-wrong-answer-extractor" href="#" data-book-id="${bookId}">
           ${escapeHtml(book.name)} 추출기 열기
-        </button>
+        </a>
         ${book.variants === 1 ? '<small>엣지플러스는 유사문항이 1개까지 제공됩니다.</small>' : ""}
       </section>
     `;
@@ -1796,6 +1815,10 @@ teacherMainTabs.forEach((button) => {
 wrongAnswerStudent.addEventListener("change", () => {
   selectedWrongAnswerStudent = wrongAnswerStudent.value;
   renderWrongAnswerExtractor();
+});
+
+wrongAnswerOutputMode.addEventListener("change", () => {
+  wrongAnswerQuestionList.querySelectorAll(".wrong-answer-book-card").forEach(updateWrongAnswerExtractorLink);
 });
 
 materialFile.addEventListener("change", () => {
