@@ -27,6 +27,7 @@
         <button class="teacher-main-tab is-active" type="button" data-module="assignments" aria-selected="true">과제</button>
         <button class="teacher-main-tab" type="button" data-module="attendance" aria-selected="false">출결</button>
         <button class="teacher-main-tab" type="button" data-module="tests" aria-selected="false">테스트</button>
+        <button class="teacher-main-tab" type="button" data-module="wronganswers" aria-selected="false">오답 추출</button>
         <button class="teacher-main-tab" type="button" data-module="materials" aria-selected="false">학습자료</button>
         <button class="teacher-main-tab" type="button" data-module="monthly" aria-selected="false">월간 리포트</button>
       </nav>
@@ -151,6 +152,33 @@
           <span id="teacherMaterialCount" class="badge">0개</span>
         </div>
         <div id="teacherMaterialList" class="teacher-material-list"></div>
+      </section>
+
+      <section id="wrongAnswerManagementModule" class="panel teacher-module wrong-answer-module" hidden>
+        <div class="management-module-head">
+          <div>
+            <p class="eyebrow">질문 체크 문항으로 바로 제작</p>
+            <h2>학생 오답 추출</h2>
+          </div>
+          <span id="wrongAnswerClassLabel" class="badge">반 선택</span>
+        </div>
+        <div class="wrong-answer-controls">
+          <label>
+            학생
+            <select id="wrongAnswerStudent"></select>
+          </label>
+          <label>
+            출력 방식
+            <select id="wrongAnswerOutputMode">
+              <option value="original">오답만</option>
+              <option value="variant1" selected>오답 + 유사 1</option>
+              <option value="variant2">오답 + 유사 1·2</option>
+            </select>
+          </label>
+        </div>
+        <p class="wrong-answer-help">학생이 질문 체크한 문항을 교재별로 골라 HWP를 만듭니다.</p>
+        <div id="wrongAnswerQuestionList" class="wrong-answer-question-list"></div>
+        <p id="wrongAnswerMessage" class="message"></p>
       </section>
 
       <section id="attendanceManagementModule" class="panel teacher-module" hidden>

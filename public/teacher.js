@@ -24,6 +24,12 @@ const attendanceManagementModule = document.querySelector("#attendanceManagement
 const testManagementModule = document.querySelector("#testManagementModule");
 const monthlyManagementModule = document.querySelector("#monthlyManagementModule");
 const materialsManagementModule = document.querySelector("#materialsManagementModule");
+const wrongAnswerManagementModule = document.querySelector("#wrongAnswerManagementModule");
+const wrongAnswerClassLabel = document.querySelector("#wrongAnswerClassLabel");
+const wrongAnswerStudent = document.querySelector("#wrongAnswerStudent");
+const wrongAnswerOutputMode = document.querySelector("#wrongAnswerOutputMode");
+const wrongAnswerQuestionList = document.querySelector("#wrongAnswerQuestionList");
+const wrongAnswerMessage = document.querySelector("#wrongAnswerMessage");
 const materialUploadForm = document.querySelector("#materialUploadForm");
 const materialTitle = document.querySelector("#materialTitle");
 const materialFile = document.querySelector("#materialFile");
@@ -74,6 +80,8 @@ let testStudents = [];
 let selectedTestId = "";
 let monthlyData = null;
 let teacherMaterials = [];
+let selectedWrongAnswerStudent = "";
+let teacherClassRosters = {};
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -326,6 +334,8 @@ async function loadActiveTeacherModule() {
     await loadMonthlyReport();
   } else if (teacherModule === "materials") {
     await loadMaterials();
+  } else if (teacherModule === "wronganswers") {
+    renderWrongAnswerExtractor();
   }
 }
 
@@ -336,6 +346,7 @@ function setTeacherModule(module) {
   testManagementModule.hidden = module !== "tests";
   monthlyManagementModule.hidden = module !== "monthly";
   materialsManagementModule.hidden = module !== "materials";
+  wrongAnswerManagementModule.hidden = module !== "wronganswers";
   teacherMainTabs.forEach((button) => {
     const active = button.dataset.module === module;
     button.classList.toggle("is-active", active);
@@ -351,11 +362,204 @@ function setTeacherModule(module) {
       : module === "tests"
         ? testMessage
         : module === "materials"
-          ? materialMessage
+        ? materialMessage
+        : module === "wronganswers"
+          ? wrongAnswerMessage
           : monthlyReportMessage;
     target.className = "message error";
     target.textContent = error.message;
   });
+}
+
+const extractorBooks = {
+  edgeplus: { name: "엣지플러스", variants: 1 },
+  "focuson-core-26-midterm2": { name: "포커스온 Core", variants: 2 },
+  "focuson-decision-26-midterm2": { name: "포커스온 Decision", variants: 2 },
+};
+
+function extractorQuestion(item) {
+  const book = String(item?.book || "").replaceAll(/\s+/g, " ").trim();
+  const number = Number(item?.number);
+  if (!Number.isInteger(number) || number < 1) {
+    return null;
+  }
+
+  if (/엣지/i.test(book)) {
+    return { bookId: "edgeplus", sourceNumber: number };
+  }
+
+  const unitOffsets = {
+    평면좌표: { example: 0, problem: 4 },
+    "직선의 방정식": { example: 40, problem: 44 },
+    "원의 방정식": { example: 90, problem: 97 },
+    "도형의 이동": { example: 135, problem: 141 },
+    집합: { example: 173, problem: 181 },
+  };
+  const decisionOffsets = {
+    평면좌표: 0,
+    "직선의 방정식": 12,
+    "원의 방정식": 28,
+    "도형의 이동": 46,
+    집합: 64,
+  };
+  const unit = Object.keys(unitOffsets).find((name) => book.includes(name));
+
+  if (/코어|core/i.test(book) && unit) {
+    const offset = book.includes("유제") ? unitOffsets[unit].example : unitOffsets[unit].problem;
+    return { bookId: "focuson-core-26-midterm2", sourceNumber: offset + number };
+  }
+  if (/디씨전|디시전|decision/i.test(book) && unit) {
+    return { bookId: "focuson-decision-26-midterm2", sourceNumber: decisionOffsets[unit] + number };
+  }
+  return null;
+}
+
+function studentsForWrongAnswerClass() {
+  const currentRoster = teacherClassRosters[selectedClassName] || [];
+  if (currentRoster.length) {
+    return currentRoster.slice();
+  }
+  const names = new Set();
+  latestAssignments
+    .filter((assignment) => assignment.className === selectedClassName)
+    .forEach((assignment) => {
+      (assignment.students || []).forEach((name) => names.add(name));
+      (assignment.responses || []).forEach((response) => names.add(response.studentName));
+    });
+  return [...names].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
+function wrongAnswerQuestions(studentName) {
+  const questions = new Map();
+  let unsupportedCount = 0;
+  latestAssignments
+    .filter((assignment) => assignment.className === selectedClassName)
+    .forEach((assignment) => {
+      const response = (assignment.responses || []).find((item) => item.studentName === studentName);
+      if (!response) {
+        return;
+      }
+      const items = itemMap(assignment);
+      (response.problems || []).forEach((problem) => {
+        const item = items[String(problem)];
+        const extractor = extractorQuestion(item);
+        if (!item || !extractor) {
+          unsupportedCount += 1;
+          return;
+        }
+        const key = `${extractor.bookId}:${extractor.sourceNumber}`;
+        if (!questions.has(key)) {
+          questions.set(key, {
+            ...extractor,
+            label: item.label,
+            assignments: [],
+          });
+        }
+        questions.get(key).assignments.push(assignment.dateLabel);
+      });
+    });
+  return {
+    questions: [...questions.values()].sort((a, b) => a.bookId.localeCompare(b.bookId) || a.sourceNumber - b.sourceNumber),
+    unsupportedCount,
+  };
+}
+
+function bindWrongAnswerActions() {
+  wrongAnswerQuestionList.querySelectorAll(".wrong-answer-toggle-all").forEach((button) => {
+    button.addEventListener("click", () => {
+      const card = button.closest(".wrong-answer-book-card");
+      const boxes = [...card.querySelectorAll('input[type="checkbox"]')];
+      const shouldCheck = boxes.some((box) => !box.checked);
+      boxes.forEach((box) => { box.checked = shouldCheck; });
+      button.textContent = shouldCheck ? "전체 해제" : "전체 선택";
+    });
+  });
+
+  wrongAnswerQuestionList.querySelectorAll(".open-wrong-answer-extractor").forEach((button) => {
+    button.addEventListener("click", () => {
+      const card = button.closest(".wrong-answer-book-card");
+      const numbers = [...card.querySelectorAll('input[type="checkbox"]:checked')]
+        .map((box) => Number(box.value))
+        .sort((a, b) => a - b);
+      if (!numbers.length) {
+        wrongAnswerMessage.className = "message error";
+        wrongAnswerMessage.textContent = "추출할 문항을 하나 이상 선택해 주세요.";
+        return;
+      }
+      const book = extractorBooks[button.dataset.bookId];
+      let mode = wrongAnswerOutputMode.value;
+      if (book.variants === 1 && mode === "variant2") {
+        mode = "variant1";
+      }
+      const params = new URLSearchParams({
+        student: selectedWrongAnswerStudent,
+        book: button.dataset.bookId,
+        numbers: numbers.join(","),
+        mode,
+      });
+      wrongAnswerMessage.className = "message success";
+      wrongAnswerMessage.textContent = "오답문항추출기를 여는 중입니다. 브라우저 확인창이 나오면 열기를 눌러 주세요.";
+      window.location.href = `hwang-extractor://open?${params.toString()}`;
+    });
+  });
+}
+
+function renderWrongAnswerExtractor() {
+  wrongAnswerClassLabel.textContent = shortClassName(selectedClassName);
+  const students = studentsForWrongAnswerClass();
+  if (!students.includes(selectedWrongAnswerStudent)) {
+    selectedWrongAnswerStudent = students[0] || "";
+  }
+  wrongAnswerStudent.innerHTML = students.length
+    ? students.map((name) => `<option value="${escapeHtml(name)}" ${name === selectedWrongAnswerStudent ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")
+    : '<option value="">학생 없음</option>';
+
+  if (!selectedWrongAnswerStudent) {
+    wrongAnswerQuestionList.innerHTML = '<p class="muted">이 반에 등록된 학생이 없습니다.</p>';
+    return;
+  }
+
+  const { questions, unsupportedCount } = wrongAnswerQuestions(selectedWrongAnswerStudent);
+  const grouped = Object.groupBy
+    ? Object.groupBy(questions, (item) => item.bookId)
+    : questions.reduce((result, item) => {
+        (result[item.bookId] ||= []).push(item);
+        return result;
+      }, {});
+  const cards = Object.entries(grouped).map(([bookId, items]) => {
+    const book = extractorBooks[bookId];
+    return `
+      <section class="wrong-answer-book-card">
+        <div class="wrong-answer-book-head">
+          <div>
+            <span>${escapeHtml(book.name)}</span>
+            <strong>${items.length}문항</strong>
+          </div>
+          <button class="ghost wrong-answer-toggle-all" type="button">전체 해제</button>
+        </div>
+        <div class="wrong-answer-check-grid">
+          ${items.map((item) => `
+            <label title="${escapeHtml([...new Set(item.assignments)].join(", "))} 과제">
+              <input type="checkbox" value="${item.sourceNumber}" checked />
+              <span>${escapeHtml(item.label)}</span>
+            </label>
+          `).join("")}
+        </div>
+        <button class="primary open-wrong-answer-extractor" type="button" data-book-id="${bookId}">
+          ${escapeHtml(book.name)} 추출기 열기
+        </button>
+        ${book.variants === 1 ? '<small>엣지플러스는 유사문항이 1개까지 제공됩니다.</small>' : ""}
+      </section>
+    `;
+  }).join("");
+
+  wrongAnswerQuestionList.innerHTML = cards || '<p class="muted">이 학생이 질문 체크한 지원 교재 문항이 없습니다.</p>';
+  if (unsupportedCount) {
+    wrongAnswerQuestionList.insertAdjacentHTML("beforeend", `<p class="wrong-answer-unsupported">쎈·고쟁이·그린 등 추출기에 등록되지 않은 질문 ${unsupportedCount}개는 제외되었습니다.</p>`);
+  }
+  wrongAnswerMessage.className = "message";
+  wrongAnswerMessage.textContent = "";
+  bindWrongAnswerActions();
 }
 
 function materialDateTime(value) {
@@ -1405,6 +1609,7 @@ function renderTeacherClassTabs(classes) {
       selectedPastAssignmentId = "";
       selectedAttendanceDate = "";
       selectedTestId = "";
+      selectedWrongAnswerStudent = "";
       monthlyReportPreview.hidden = true;
       if (teacherModule === "assignments") {
         renderFocusedDashboard();
@@ -1417,6 +1622,8 @@ function renderTeacherClassTabs(classes) {
               ? testMessage
               : teacherModule === "materials"
                 ? materialMessage
+                : teacherModule === "wronganswers"
+                  ? wrongAnswerMessage
                 : monthlyReportMessage;
           target.className = "message error";
           target.textContent = error.message;
@@ -1543,6 +1750,9 @@ function renderAssignments(assignments, knownClasses = []) {
 
 async function loadAssignments() {
   const [payload, classPayload] = await Promise.all([api("/api/assignments"), api("/api/classes")]);
+  teacherClassRosters = Object.fromEntries(
+    (classPayload.classes || []).map((item) => [item.name, (item.students || []).map((student) => typeof student === "string" ? student : student.name)]),
+  );
   renderAssignments(payload.assignments, (classPayload.classes || []).map((item) => item.name));
 }
 
@@ -1581,6 +1791,11 @@ studentPasswordSettings.addEventListener("toggle", () => {
 
 teacherMainTabs.forEach((button) => {
   button.addEventListener("click", () => setTeacherModule(button.dataset.module));
+});
+
+wrongAnswerStudent.addEventListener("change", () => {
+  selectedWrongAnswerStudent = wrongAnswerStudent.value;
+  renderWrongAnswerExtractor();
 });
 
 materialFile.addEventListener("change", () => {
