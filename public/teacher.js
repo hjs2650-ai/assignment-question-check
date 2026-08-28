@@ -486,7 +486,8 @@ function updateWrongAnswerExtractorLink(card) {
     numbers: numbers.join(","),
     mode,
   });
-  link.href = `hwang-extractor://open?${params.toString()}`;
+  link.href = `http://127.0.0.1:32145/open?${params.toString()}`;
+  link.target = "_blank";
   link.removeAttribute("aria-disabled");
   return numbers;
 }
@@ -518,7 +519,7 @@ function bindWrongAnswerActions() {
         return;
       }
       wrongAnswerMessage.className = "message success";
-      wrongAnswerMessage.textContent = "오답문항추출기를 여는 중입니다. 브라우저 확인창이 나오면 열기를 눌러 주세요.";
+      wrongAnswerMessage.textContent = "오답문항추출기를 여는 중입니다.";
     });
   });
 }
