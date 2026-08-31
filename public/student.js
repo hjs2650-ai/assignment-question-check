@@ -640,6 +640,27 @@ function renderStudentRecords(payload) {
                 <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>
               </div>
               ${!test.absent && test.score !== null ? `
+                ${test.estimatedGradeCutoffs && Object.keys(test.estimatedGradeCutoffs).length === 4 ? `
+                  <section class="student-estimated-grade">
+                    <div class="student-estimated-grade-result">
+                      <span>현재 점수 기준</span>
+                      <strong>예상 ${escapeHtml(test.estimatedGrade)}등급</strong>
+                      <small>5등급제 · 실제 등급컷은 학교 성적 분포에 따라 달라질 수 있습니다.</small>
+                    </div>
+                    <div class="student-grade-cutoff-list" aria-label="예상 등급컷">
+                      ${[1, 2, 3, 4].map((grade) => `
+                        <div class="${Number(test.estimatedGrade) === grade ? "is-current" : ""}">
+                          <span>${grade}등급</span>
+                          <strong>${escapeHtml(test.estimatedGradeCutoffs[String(grade)])}점 이상</strong>
+                        </div>
+                      `).join("")}
+                      <div class="${Number(test.estimatedGrade) === 5 ? "is-current" : ""}">
+                        <span>5등급</span>
+                        <strong>${escapeHtml(test.estimatedGradeCutoffs["4"])}점 미만</strong>
+                      </div>
+                    </div>
+                  </section>
+                ` : ""}
                 <div class="student-past-exam-analysis">
                   <strong>틀린 문항과 유형</strong>
                   ${(test.wrongDetails || []).length ? `

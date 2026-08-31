@@ -578,6 +578,7 @@ function normalizeData(data) {
       maxScore: Number(test.maxScore),
       topics: normalizeLabelList(test.topics),
       questionAnalysis: normalizeQuestionAnalysis(test.questionAnalysis),
+      estimatedGradeCutoffs: normalizeEstimatedGradeCutoffs(test.estimatedGradeCutoffs, Number(test.maxScore)),
       scores: test.scores && typeof test.scores === "object" ? test.scores : {},
       createdAt: test.createdAt || new Date().toISOString(),
       updatedAt: test.updatedAt || test.createdAt || new Date().toISOString(),
@@ -835,6 +836,46 @@ function normalizeQuestionAnalysis(value) {
   );
 }
 
+function normalizeEstimatedGradeCutoffs(value, maxScore = 100) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  const maximum = Number(maxScore);
+  const cutoffs = Object.fromEntries(
+    [1, 2, 3, 4]
+      .map((grade) => {
+        const rawValue = value[String(grade)] ?? value[grade];
+        if (rawValue === "" || rawValue === null || rawValue === undefined) {
+          return null;
+        }
+        const score = Number(rawValue);
+        if (!Number.isFinite(score) || score < 0 || (Number.isFinite(maximum) && score > maximum)) {
+          return null;
+        }
+        return [String(grade), Math.round(score * 10) / 10];
+      })
+      .filter(Boolean),
+  );
+  const values = [1, 2, 3, 4].map((grade) => cutoffs[String(grade)]);
+  if (values.some((score) => score === undefined) || values.some((score, index) => index > 0 && values[index - 1] <= score)) {
+    return {};
+  }
+  return cutoffs;
+}
+
+function estimatedGradeForScore(score, cutoffs) {
+  const numericScore = Number(score);
+  if (!Number.isFinite(numericScore) || !cutoffs || Object.keys(cutoffs).length !== 4) {
+    return null;
+  }
+  for (let grade = 1; grade <= 4; grade += 1) {
+    if (numericScore >= cutoffs[String(grade)]) {
+      return grade;
+    }
+  }
+  return 5;
+}
+
 function scoreFromWrongQuestions(test, wrongQuestions) {
   const analysis = normalizeQuestionAnalysis(test.questionAnalysis);
   const deduction = normalizeWrongQuestions(wrongQuestions)
@@ -866,6 +907,7 @@ function publicTest(test, students = []) {
     maxScore: test.maxScore,
     topics: normalizeLabelList(test.topics),
     questionAnalysis: normalizeQuestionAnalysis(test.questionAnalysis),
+    estimatedGradeCutoffs: normalizeEstimatedGradeCutoffs(test.estimatedGradeCutoffs, test.maxScore),
     scores: Object.fromEntries(students.map((student) => [student, normalizedScore(test.scores[student])])),
     createdAt: test.createdAt,
     updatedAt: test.updatedAt,
@@ -989,6 +1031,11 @@ function pastExamSummaryForStudent(data, className, studentName, month = "") {
         kind: "past_exam",
         maxScore: test.maxScore,
         topics: normalizeLabelList(test.topics),
+        estimatedGradeCutoffs: normalizeEstimatedGradeCutoffs(test.estimatedGradeCutoffs, test.maxScore),
+        estimatedGrade: estimatedGradeForScore(
+          result.score,
+          normalizeEstimatedGradeCutoffs(test.estimatedGradeCutoffs, test.maxScore),
+        ),
         ...result,
         wrongDetails,
         weakTypes: [...weakTypeMap.values()].sort((left, right) => right.count - left.count || left.type.localeCompare(right.type)),
@@ -1648,6 +1695,7 @@ async function handleApi(req, res, pathname) {
         maxScore,
         topics: normalizeLabelList(body.topics),
         questionAnalysis: normalizeQuestionAnalysis(body.questionAnalysis),
+        estimatedGradeCutoffs: normalizeEstimatedGradeCutoffs(body.estimatedGradeCutoffs, maxScore),
         scores: {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1687,6 +1735,9 @@ async function handleApi(req, res, pathname) {
       }
       if (body.questionAnalysis !== undefined) {
         test.questionAnalysis = normalizeQuestionAnalysis(body.questionAnalysis);
+      }
+      if (body.estimatedGradeCutoffs !== undefined) {
+        test.estimatedGradeCutoffs = normalizeEstimatedGradeCutoffs(body.estimatedGradeCutoffs, test.maxScore);
       }
       if (body.scores && typeof body.scores === "object") {
         test.scores = Object.fromEntries(

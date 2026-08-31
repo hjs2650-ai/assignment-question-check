@@ -278,6 +278,19 @@
                 <input id="selectedTestTopics" placeholder="쉼표로 여러 단원을 구분해 주세요." />
               </label>
             </div>
+            <section id="estimatedGradeCutoffFields" class="estimated-grade-cutoff-fields" hidden>
+              <div>
+                <strong>5등급제 예상 등급컷</strong>
+                <small>각 등급이 시작되는 예상 점수를 입력해 주세요.</small>
+              </div>
+              <div class="estimated-grade-cutoff-inputs">
+                <label>1등급 <input id="estimatedGradeCutoff1" type="number" min="0" max="100" step="0.1" placeholder="예: 86" /></label>
+                <label>2등급 <input id="estimatedGradeCutoff2" type="number" min="0" max="100" step="0.1" placeholder="예: 72" /></label>
+                <label>3등급 <input id="estimatedGradeCutoff3" type="number" min="0" max="100" step="0.1" placeholder="예: 55" /></label>
+                <label>4등급 <input id="estimatedGradeCutoff4" type="number" min="0" max="100" step="0.1" placeholder="예: 38" /></label>
+              </div>
+              <p>5등급은 4등급컷 미만으로 표시됩니다.</p>
+            </section>
             <div id="testScoreRows" class="test-score-rows"></div>
             <button id="saveTestScoresButton" class="primary" type="button">점수 저장</button>
             <p id="testMessage" class="message"></p>

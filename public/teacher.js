@@ -55,6 +55,8 @@ const selectedTestDate = document.querySelector("#selectedTestDate");
 const selectedTestTitle = document.querySelector("#selectedTestTitle");
 const selectedTestKind = document.querySelector("#selectedTestKind");
 const selectedTestTopics = document.querySelector("#selectedTestTopics");
+const estimatedGradeCutoffFields = document.querySelector("#estimatedGradeCutoffFields");
+const estimatedGradeCutoffInputs = [1, 2, 3, 4].map((grade) => document.querySelector(`#estimatedGradeCutoff${grade}`));
 const testScoreRows = document.querySelector("#testScoreRows");
 const saveTestScoresButton = document.querySelector("#saveTestScoresButton");
 const deleteTestButton = document.querySelector("#deleteTestButton");
@@ -843,6 +845,20 @@ function questionAnalysisFor(test) {
   return test?.questionAnalysis && typeof test.questionAnalysis === "object" ? test.questionAnalysis : {};
 }
 
+function estimatedGradeCutoffsFromInputs(test) {
+  const values = estimatedGradeCutoffInputs.map((input) => (input.value === "" ? null : Number(input.value)));
+  if (values.every((value) => value === null)) {
+    return {};
+  }
+  if (
+    values.some((value) => value === null || !Number.isFinite(value) || value < 0 || value > Number(test.maxScore)) ||
+    values.some((value, index) => index > 0 && values[index - 1] <= value)
+  ) {
+    throw new Error("예상 등급컷은 1등급부터 4등급까지 높은 점수 순서로 모두 입력해 주세요.");
+  }
+  return Object.fromEntries(values.map((value, index) => [String(index + 1), value]));
+}
+
 function calculatedPastExamResult(test, rawValue) {
   const parsed = parseWrongQuestionInput(rawValue);
   if (!parsed.provided) {
@@ -948,6 +964,11 @@ function renderTestEditor() {
   selectedTestKind.value = test.kind;
   selectedTestTopics.value = (test.topics || []).join(", ");
   const isPastExam = test.kind === "past_exam";
+  estimatedGradeCutoffFields.hidden = !isPastExam;
+  estimatedGradeCutoffInputs.forEach((input, index) => {
+    input.max = String(test.maxScore);
+    input.value = test.estimatedGradeCutoffs?.[String(index + 1)] ?? "";
+  });
   testScoreRows.innerHTML = testStudents
     .map((student) => {
       const result = test.scores?.[student] || { score: null, absent: false, note: "" };
@@ -1075,9 +1096,15 @@ async function saveTestScores() {
   testMessage.className = "message";
   testMessage.textContent = "점수를 저장하는 중입니다.";
   try {
+    const estimatedGradeCutoffs = test.kind === "past_exam" ? estimatedGradeCutoffsFromInputs(test) : {};
     await api(`/api/tests/${encodeURIComponent(test.id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ scores, topics: selectedTestTopics.value, kind: selectedTestKind.value }),
+      body: JSON.stringify({
+        scores,
+        topics: selectedTestTopics.value,
+        kind: selectedTestKind.value,
+        estimatedGradeCutoffs,
+      }),
     });
     testMessage.className = "message success";
     testMessage.textContent = "점수를 저장했습니다.";

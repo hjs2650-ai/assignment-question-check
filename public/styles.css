@@ -2109,6 +2109,63 @@ summary {
   border-bottom: 0;
 }
 
+.student-estimated-grade {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.5fr);
+  gap: 12px;
+  margin: 4px 4px 12px;
+  border: 1px solid #ead58f;
+  padding: 12px;
+  background: #fffbed;
+}
+
+.student-estimated-grade-result {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.student-estimated-grade-result span,
+.student-estimated-grade-result small {
+  color: #796b48;
+  font-size: 12px;
+}
+
+.student-estimated-grade-result strong {
+  color: #9a5b2d;
+  font-size: 21px;
+}
+
+.student-grade-cutoff-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(68px, 1fr));
+  gap: 5px;
+}
+
+.student-grade-cutoff-list > div {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #e7dcc0;
+  padding: 8px 6px;
+  background: #fff;
+  text-align: center;
+}
+
+.student-grade-cutoff-list > div.is-current {
+  border-color: #d77967;
+  background: #fff0ec;
+}
+
+.student-grade-cutoff-list span {
+  color: #786f60;
+  font-size: 11px;
+}
+
+.student-grade-cutoff-list strong {
+  color: #463f33;
+  font-size: 12px;
+}
+
 .student-past-exam-analysis {
   margin: 0 4px;
   border-left: 3px solid #7ab9a7;
@@ -2520,6 +2577,42 @@ summary {
 .selected-test-meta-fields label {
   display: grid;
   gap: 6px;
+}
+
+.estimated-grade-cutoff-fields {
+  margin: 0 0 16px;
+  border: 1px solid #d9cfae;
+  padding: 13px;
+  background: #fffaf0;
+}
+
+.estimated-grade-cutoff-fields > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.estimated-grade-cutoff-fields small,
+.estimated-grade-cutoff-fields p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.estimated-grade-cutoff-fields p {
+  margin: 8px 0 0;
+}
+
+.estimated-grade-cutoff-inputs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+.estimated-grade-cutoff-inputs label {
+  display: grid;
+  gap: 5px;
 }
 
 .test-score-row {
@@ -3170,6 +3263,19 @@ body[data-theme="night"] .range-text {
   .test-create-form,
   .selected-test-meta-fields {
     grid-template-columns: 1fr;
+  }
+
+  .student-estimated-grade,
+  .estimated-grade-cutoff-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .student-grade-cutoff-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-grade-cutoff-list > div:last-child {
+    grid-column: 1 / -1;
   }
 
   .test-score-row {
