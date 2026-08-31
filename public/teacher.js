@@ -813,6 +813,83 @@ function testKindLabel(kind) {
   return "일반 테스트";
 }
 
+function parseWrongQuestionInput(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return { provided: false, numbers: [], invalid: [] };
+  }
+  if (/^(없음|없어|전부\s*정답|만점|0|-)$/.test(text)) {
+    return { provided: true, numbers: [], invalid: [] };
+  }
+  const tokens = text.split(/[\s,]+/).filter(Boolean);
+  const numbers = [];
+  const invalid = [];
+  tokens.forEach((token) => {
+    const match = token.match(/^(\d+)(?:번)?$/);
+    if (!match) {
+      invalid.push(token);
+      return;
+    }
+    const number = Number(match[1]);
+    if (!numbers.includes(number)) {
+      numbers.push(number);
+    }
+  });
+  numbers.sort((left, right) => left - right);
+  return { provided: true, numbers, invalid };
+}
+
+function questionAnalysisFor(test) {
+  return test?.questionAnalysis && typeof test.questionAnalysis === "object" ? test.questionAnalysis : {};
+}
+
+function calculatedPastExamResult(test, rawValue) {
+  const parsed = parseWrongQuestionInput(rawValue);
+  if (!parsed.provided) {
+    return { ...parsed, score: null, details: [], unknown: [] };
+  }
+  const analysis = questionAnalysisFor(test);
+  const unknown = parsed.numbers.filter((number) => !analysis[String(number)]);
+  const details = parsed.numbers
+    .map((number) => ({ number, ...analysis[String(number)] }))
+    .filter((question) => Number.isFinite(Number(question.points)));
+  const deduction = details.reduce((sum, question) => sum + Number(question.points), 0);
+  return {
+    ...parsed,
+    unknown,
+    details,
+    score: parsed.invalid.length || unknown.length
+      ? null
+      : Math.max(0, Math.round((Number(test.maxScore) - deduction) * 10) / 10),
+  };
+}
+
+function pastExamAnalysisText(result) {
+  if (!result.provided) {
+    return "틀린 번호를 입력하면 점수와 유형이 자동 계산됩니다.";
+  }
+  if (result.invalid.length) {
+    return `입력 형식을 확인해 주세요: ${result.invalid.join(", ")}`;
+  }
+  if (result.unknown.length) {
+    return `배점표에 없는 번호입니다: ${result.unknown.join(", ")}번`;
+  }
+  if (!result.details.length) {
+    return "전부 정답 · 오답 유형 없음";
+  }
+  return result.details.map((question) => `${question.number}번 ${question.type || question.topic}`).join(" · ");
+}
+
+function refreshPastExamScoreRow(row, test) {
+  const wrongInput = row.querySelector(".student-test-wrong");
+  const scoreInput = row.querySelector(".student-test-score");
+  const analysisElement = row.querySelector(".past-exam-row-analysis");
+  const result = calculatedPastExamResult(test, wrongInput.value);
+  scoreInput.value = result.score === null ? "" : result.score;
+  analysisElement.textContent = pastExamAnalysisText(result);
+  analysisElement.classList.toggle("is-error", Boolean(result.invalid.length || result.unknown.length));
+}
+
 function renderTestCumulative() {
   testCumulativeTable.innerHTML = testStudents.length
     ? `
@@ -870,15 +947,30 @@ function renderTestEditor() {
   selectedTestTitle.textContent = test.name;
   selectedTestKind.value = test.kind;
   selectedTestTopics.value = (test.topics || []).join(", ");
+  const isPastExam = test.kind === "past_exam";
   testScoreRows.innerHTML = testStudents
     .map((student) => {
       const result = test.scores?.[student] || { score: null, absent: false, note: "" };
+      const wrongQuestions = Array.isArray(result.wrongQuestions) ? result.wrongQuestions : [];
+      const wrongValue = result.absent
+        ? ""
+        : wrongQuestions.length
+          ? wrongQuestions.join(", ")
+          : result.score === test.maxScore
+            ? "없음"
+            : "";
       return `
-        <div class="test-score-row">
+        <div class="test-score-row ${isPastExam ? "is-past-exam" : ""}">
           <strong>${escapeHtml(student)}</strong>
+          ${isPastExam ? `
+            <label>
+              틀린 번호
+              <input class="student-test-wrong" data-student="${escapeHtml(student)}" value="${escapeHtml(wrongValue)}" placeholder="예: 3, 7, 18 / 없음" ${result.absent ? "disabled" : ""} />
+            </label>
+          ` : ""}
           <label>
             점수
-            <input class="student-test-score" data-student="${escapeHtml(student)}" type="number" min="0" max="${escapeHtml(test.maxScore)}" value="${result.score ?? ""}" ${result.absent ? "disabled" : ""} />
+            <input class="student-test-score" data-student="${escapeHtml(student)}" type="number" min="0" max="${escapeHtml(test.maxScore)}" value="${result.score ?? ""}" ${result.absent || isPastExam ? "disabled" : ""} />
           </label>
           <label class="test-absent-check">
             <input class="student-test-absent" data-student="${escapeHtml(student)}" type="checkbox" ${result.absent ? "checked" : ""} />
@@ -888,6 +980,7 @@ function renderTestEditor() {
             메모
             <input class="student-test-note" data-student="${escapeHtml(student)}" value="${escapeHtml(result.note || "")}" placeholder="선택" />
           </label>
+          ${isPastExam ? `<div class="past-exam-row-analysis">${escapeHtml(pastExamAnalysisText(calculatedPastExamResult(test, wrongValue)))}</div>` : ""}
         </div>
       `;
     })
@@ -895,12 +988,21 @@ function renderTestEditor() {
   testScoreRows.querySelectorAll(".student-test-absent").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
       const scoreInput = testScoreRows.querySelector(`.student-test-score[data-student="${CSS.escape(checkbox.dataset.student)}"]`);
-      scoreInput.disabled = checkbox.checked;
+      const wrongInput = testScoreRows.querySelector(`.student-test-wrong[data-student="${CSS.escape(checkbox.dataset.student)}"]`);
+      scoreInput.disabled = checkbox.checked || isPastExam;
+      if (wrongInput) {
+        wrongInput.disabled = checkbox.checked;
+      }
       if (checkbox.checked) {
         scoreInput.value = "";
       }
     });
   });
+  if (isPastExam) {
+    testScoreRows.querySelectorAll(".test-score-row.is-past-exam").forEach((row) => {
+      row.querySelector(".student-test-wrong").addEventListener("input", () => refreshPastExamScoreRow(row, test));
+    });
+  }
 }
 
 function renderTests() {
@@ -910,7 +1012,7 @@ function renderTests() {
           (test) => `
             <button class="teacher-test-item ${test.id === selectedTestId ? "is-active" : ""}" type="button" data-id="${test.id}">
               <strong>${escapeHtml(test.name)}</strong>
-              <span>${testKindLabel(test.kind)} · ${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점</span>
+              <span>${testKindLabel(test.kind)} · ${escapeHtml(displayIsoDate(test.date))} · ${escapeHtml(test.maxScore)}점${Object.keys(questionAnalysisFor(test)).length ? ` · ${Object.keys(questionAnalysisFor(test)).length}문항` : ""}</span>
               ${(test.topics || []).length ? `<small>${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
             </button>
           `,
@@ -949,13 +1051,23 @@ async function saveTestScores() {
       const scoreInput = testScoreRows.querySelector(`.student-test-score[data-student="${CSS.escape(student)}"]`);
       const absentInput = testScoreRows.querySelector(`.student-test-absent[data-student="${CSS.escape(student)}"]`);
       const noteInput = testScoreRows.querySelector(`.student-test-note[data-student="${CSS.escape(student)}"]`);
+      const wrongInput = testScoreRows.querySelector(`.student-test-wrong[data-student="${CSS.escape(student)}"]`);
+      const wrongResult = wrongInput ? calculatedPastExamResult(test, wrongInput.value) : null;
+      if (wrongResult && (wrongResult.invalid.length || wrongResult.unknown.length)) {
+        throw new Error(`${student} 학생의 틀린 번호를 확인해 주세요.`);
+      }
+      const result = {
+        score: scoreInput.value === "" ? null : Number(scoreInput.value),
+        absent: absentInput.checked,
+        note: noteInput.value,
+      };
+      if (wrongResult?.provided && !absentInput.checked) {
+        result.wrongQuestions = wrongResult.numbers;
+        result.score = wrongResult.score;
+      }
       return [
         student,
-        {
-          score: scoreInput.value === "" ? null : Number(scoreInput.value),
-          absent: absentInput.checked,
-          note: noteInput.value,
-        },
+        result,
       ];
     }),
   );
@@ -1929,6 +2041,15 @@ saveTestScoresButton.addEventListener("click", () => {
     testMessage.textContent = error.message;
     saveTestScoresButton.disabled = false;
   });
+});
+
+selectedTestKind.addEventListener("change", () => {
+  const test = selectedTest();
+  if (!test) {
+    return;
+  }
+  test.kind = selectedTestKind.value;
+  renderTestEditor();
 });
 
 deleteTestButton.addEventListener("click", async () => {

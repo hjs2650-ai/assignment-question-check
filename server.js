@@ -577,6 +577,7 @@ function normalizeData(data) {
           : "test",
       maxScore: Number(test.maxScore),
       topics: normalizeLabelList(test.topics),
+      questionAnalysis: normalizeQuestionAnalysis(test.questionAnalysis),
       scores: test.scores && typeof test.scores === "object" ? test.scores : {},
       createdAt: test.createdAt || new Date().toISOString(),
       updatedAt: test.updatedAt || test.createdAt || new Date().toISOString(),
@@ -805,6 +806,42 @@ function attendanceSummaryForStudent(data, className, studentName, month) {
   };
 }
 
+function normalizeWrongQuestions(value) {
+  const values = Array.isArray(value) ? value : normalizeText(value).split(/[\s,]+/);
+  return [...new Set(values.map(Number).filter((number) => Number.isSafeInteger(number) && number > 0))]
+    .sort((a, b) => a - b);
+}
+
+function normalizeQuestionAnalysis(value) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([number, question]) => {
+        const questionNumber = Number(number);
+        const points = Number(question && question.points);
+        if (!Number.isSafeInteger(questionNumber) || questionNumber <= 0 || !Number.isFinite(points) || points <= 0) {
+          return null;
+        }
+        return [String(questionNumber), {
+          points,
+          topic: normalizeText(question.topic),
+          type: normalizeText(question.type),
+        }];
+      })
+      .filter(Boolean)
+      .sort(([left], [right]) => Number(left) - Number(right)),
+  );
+}
+
+function scoreFromWrongQuestions(test, wrongQuestions) {
+  const analysis = normalizeQuestionAnalysis(test.questionAnalysis);
+  const deduction = normalizeWrongQuestions(wrongQuestions)
+    .reduce((sum, number) => sum + (analysis[String(number)]?.points || 0), 0);
+  return Math.max(0, Math.round((Number(test.maxScore) - deduction) * 10) / 10);
+}
+
 function normalizedScore(value) {
   if (value && typeof value === "object") {
     const score = value.score === "" || value.score === null || value.score === undefined ? null : Number(value.score);
@@ -812,10 +849,11 @@ function normalizedScore(value) {
       score: Number.isFinite(score) ? score : null,
       absent: value.absent === true,
       note: normalizeText(value.note),
+      wrongQuestions: normalizeWrongQuestions(value.wrongQuestions),
     };
   }
   const score = value === "" || value === null || value === undefined ? null : Number(value);
-  return { score: Number.isFinite(score) ? score : null, absent: false, note: "" };
+  return { score: Number.isFinite(score) ? score : null, absent: false, note: "", wrongQuestions: [] };
 }
 
 function publicTest(test, students = []) {
@@ -827,6 +865,7 @@ function publicTest(test, students = []) {
     kind: test.kind === "relearning" ? "relearning" : test.kind === "past_exam" ? "past_exam" : "test",
     maxScore: test.maxScore,
     topics: normalizeLabelList(test.topics),
+    questionAnalysis: normalizeQuestionAnalysis(test.questionAnalysis),
     scores: Object.fromEntries(students.map((student) => [student, normalizedScore(test.scores[student])])),
     createdAt: test.createdAt,
     updatedAt: test.updatedAt,
@@ -924,16 +963,38 @@ function pastExamSummaryForStudent(data, className, studentName, month = "") {
     averagePercent: percentages.length
       ? Math.round((percentages.reduce((sum, value) => sum + value, 0) / percentages.length) * 10) / 10
       : null,
-    tests: tests.map(({ test, result }) => ({
-      id: test.id,
-      date: test.date,
-      name: test.name,
-      kind: "past_exam",
-      maxScore: test.maxScore,
-      topics: normalizeLabelList(test.topics),
-      ...result,
-      percent: result.score === null ? null : Math.round((result.score / test.maxScore) * 1000) / 10,
-    })),
+    tests: tests.map(({ test, result }) => {
+      const questionAnalysis = normalizeQuestionAnalysis(test.questionAnalysis);
+      const wrongDetails = result.wrongQuestions.map((number) => ({
+        number,
+        points: questionAnalysis[String(number)]?.points || null,
+        topic: questionAnalysis[String(number)]?.topic || "",
+        type: questionAnalysis[String(number)]?.type || "",
+      }));
+      const weakTypeMap = new Map();
+      wrongDetails.forEach((question) => {
+        const label = question.type || question.topic;
+        if (!label) {
+          return;
+        }
+        const current = weakTypeMap.get(label) || { type: label, count: 0, questions: [] };
+        current.count += 1;
+        current.questions.push(question.number);
+        weakTypeMap.set(label, current);
+      });
+      return {
+        id: test.id,
+        date: test.date,
+        name: test.name,
+        kind: "past_exam",
+        maxScore: test.maxScore,
+        topics: normalizeLabelList(test.topics),
+        ...result,
+        wrongDetails,
+        weakTypes: [...weakTypeMap.values()].sort((left, right) => right.count - left.count || left.type.localeCompare(right.type)),
+        percent: result.score === null ? null : Math.round((result.score / test.maxScore) * 1000) / 10,
+      };
+    }),
   };
 }
 
@@ -1586,6 +1647,7 @@ async function handleApi(req, res, pathname) {
         kind: body.kind === "relearning" ? "relearning" : body.kind === "past_exam" ? "past_exam" : "test",
         maxScore,
         topics: normalizeLabelList(body.topics),
+        questionAnalysis: normalizeQuestionAnalysis(body.questionAnalysis),
         scores: {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1623,9 +1685,25 @@ async function handleApi(req, res, pathname) {
       if (body.topics !== undefined) {
         test.topics = normalizeLabelList(body.topics);
       }
+      if (body.questionAnalysis !== undefined) {
+        test.questionAnalysis = normalizeQuestionAnalysis(body.questionAnalysis);
+      }
       if (body.scores && typeof body.scores === "object") {
         test.scores = Object.fromEntries(
-          students.map((student) => [student, normalizedScore(body.scores[student])]),
+          students.map((student) => {
+            const rawScore = body.scores[student];
+            const result = normalizedScore(rawScore);
+            if (
+              test.kind === "past_exam" &&
+              rawScore &&
+              typeof rawScore === "object" &&
+              Object.prototype.hasOwnProperty.call(rawScore, "wrongQuestions") &&
+              !result.absent
+            ) {
+              result.score = scoreFromWrongQuestions(test, result.wrongQuestions);
+            }
+            return [student, result];
+          }),
         );
       }
       test.updatedAt = new Date().toISOString();

@@ -629,15 +629,33 @@ function renderStudentRecords(payload) {
     ? cumulativePastExams.tests
         .map(
           (test) => `
-            <div class="student-history-row test-history-row past-exam-history-row">
-              <div>
-                <strong>${escapeHtml(test.name)}</strong>
-                <small>${escapeHtml(displayIsoDate(test.date))}</small>
-                ${(test.topics || []).length ? `<small class="test-topic-list">${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
+            <article class="student-past-exam-card">
+              <div class="student-history-row test-history-row past-exam-history-row">
+                <div>
+                  <strong>${escapeHtml(test.name)}</strong>
+                  <small>${escapeHtml(displayIsoDate(test.date))}</small>
+                  ${(test.topics || []).length ? `<small class="test-topic-list">${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
+                </div>
+                <span>${test.absent ? "미응시" : `${escapeHtml(test.score)} / ${escapeHtml(test.maxScore)}`}</span>
+                <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>
               </div>
-              <span>${test.absent ? "미응시" : `${escapeHtml(test.score)} / ${escapeHtml(test.maxScore)}`}</span>
-              <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>
-            </div>
+              ${!test.absent && test.score !== null ? `
+                <div class="student-past-exam-analysis">
+                  <strong>틀린 문항과 유형</strong>
+                  ${(test.wrongDetails || []).length ? `
+                    <div class="student-wrong-question-list">
+                      ${test.wrongDetails.map((question) => `
+                        <div>
+                          <span>${escapeHtml(question.number)}번</span>
+                          <p>${escapeHtml(question.type || question.topic || "유형 확인 중")}</p>
+                          ${question.points ? `<small>-${escapeHtml(question.points)}점</small>` : ""}
+                        </div>
+                      `).join("")}
+                    </div>
+                  ` : `<p class="student-perfect-result">틀린 문항 없음</p>`}
+                </div>
+              ` : ""}
+            </article>
           `,
         )
         .join("")

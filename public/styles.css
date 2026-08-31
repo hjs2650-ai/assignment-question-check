@@ -2100,6 +2100,61 @@ summary {
   font-weight: 700;
 }
 
+.student-past-exam-card {
+  border-bottom: 1px solid var(--student-line, var(--line));
+  padding-bottom: 10px;
+}
+
+.student-past-exam-card .student-history-row {
+  border-bottom: 0;
+}
+
+.student-past-exam-analysis {
+  margin: 0 4px;
+  border-left: 3px solid #7ab9a7;
+  padding: 10px 12px;
+  background: #f2faf7;
+}
+
+.student-past-exam-analysis > strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #176958;
+  font-size: 13px;
+}
+
+.student-wrong-question-list {
+  display: grid;
+  gap: 7px;
+}
+
+.student-wrong-question-list > div {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-wrong-question-list span {
+  color: #c15349;
+  font-weight: 900;
+}
+
+.student-wrong-question-list p,
+.student-perfect-result {
+  margin: 0;
+}
+
+.student-wrong-question-list small {
+  color: #c15349;
+  font-weight: 800;
+}
+
+.student-perfect-result {
+  color: #176958;
+  font-weight: 800;
+}
+
 .student-learning-analysis {
   margin: 0 0 24px;
   border-top: 1px solid var(--student-line, var(--line));
@@ -2474,6 +2529,26 @@ summary {
   gap: 10px;
   border-bottom: 1px solid var(--line);
   padding: 10px 0;
+}
+
+.test-score-row.is-past-exam {
+  grid-template-columns: 90px minmax(170px, 1.2fr) 100px 86px minmax(150px, 1fr);
+}
+
+.past-exam-row-analysis {
+  grid-column: 2 / -1;
+  border-left: 3px solid #8ccfbe;
+  padding: 7px 10px;
+  background: #f2faf7;
+  color: #316c61;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.past-exam-row-analysis.is-error {
+  border-left-color: #e28378;
+  background: #fff2f0;
+  color: #ad3e36;
 }
 
 .test-score-row > strong {
@@ -3099,6 +3174,18 @@ body[data-theme="night"] .range-text {
 
   .test-score-row {
     grid-template-columns: minmax(80px, 1fr) 92px 78px;
+  }
+
+  .test-score-row.is-past-exam {
+    grid-template-columns: minmax(80px, 1fr) minmax(150px, 1.5fr) 82px;
+  }
+
+  .test-score-row.is-past-exam .past-exam-row-analysis {
+    grid-column: 1 / -1;
+  }
+
+  .test-score-row.is-past-exam > label:nth-of-type(4) {
+    grid-column: 1 / -1;
   }
 
   .test-score-row > label:last-child {
