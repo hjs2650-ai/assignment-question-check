@@ -809,8 +809,31 @@ function attendanceSummaryForStudent(data, className, studentName, month) {
 
 function normalizeWrongQuestions(value) {
   const values = Array.isArray(value) ? value : normalizeText(value).split(/[\s,]+/);
-  return [...new Set(values.map(Number).filter((number) => Number.isSafeInteger(number) && number > 0))]
-    .sort((a, b) => a - b);
+  const normalized = [];
+  const wholeQuestions = new Set();
+  values.forEach((value) => {
+    const match = String(value).trim().replace(/번$/, "").match(/^(\d+)(?:\((\d+)\))?$/);
+    if (!match) {
+      return;
+    }
+    const number = Number(match[1]);
+    if (!Number.isSafeInteger(number) || number <= 0) {
+      return;
+    }
+    if (!match[2]) {
+      wholeQuestions.add(number);
+      normalized.push(number);
+      return;
+    }
+    normalized.push(`${number}(${Number(match[2])})`);
+  });
+  return [...new Set(normalized)]
+    .filter((value) => typeof value === "number" || !wholeQuestions.has(Number(String(value).match(/^\d+/)?.[0])))
+    .sort((left, right) => {
+      const leftMatch = String(left).match(/^(\d+)(?:\((\d+)\))?$/);
+      const rightMatch = String(right).match(/^(\d+)(?:\((\d+)\))?$/);
+      return Number(leftMatch[1]) - Number(rightMatch[1]) || Number(leftMatch[2] || 0) - Number(rightMatch[2] || 0);
+    });
 }
 
 function normalizeQuestionAnalysis(value) {
@@ -825,10 +848,24 @@ function normalizeQuestionAnalysis(value) {
         if (!Number.isSafeInteger(questionNumber) || questionNumber <= 0 || !Number.isFinite(points) || points <= 0) {
           return null;
         }
+        const parts = question.parts && typeof question.parts === "object"
+          ? Object.fromEntries(
+              Object.entries(question.parts)
+                .map(([part, partPoints]) => {
+                  const partNumber = Number(part);
+                  const numericPoints = Number(partPoints);
+                  return Number.isSafeInteger(partNumber) && partNumber > 0 && Number.isFinite(numericPoints) && numericPoints > 0
+                    ? [String(partNumber), numericPoints]
+                    : null;
+                })
+                .filter(Boolean),
+            )
+          : {};
         return [String(questionNumber), {
           points,
           topic: normalizeText(question.topic),
           type: normalizeText(question.type),
+          ...(Object.keys(parts).length ? { parts } : {}),
         }];
       })
       .filter(Boolean)
@@ -879,7 +916,15 @@ function estimatedGradeForScore(score, cutoffs) {
 function scoreFromWrongQuestions(test, wrongQuestions) {
   const analysis = normalizeQuestionAnalysis(test.questionAnalysis);
   const deduction = normalizeWrongQuestions(wrongQuestions)
-    .reduce((sum, number) => sum + (analysis[String(number)]?.points || 0), 0);
+    .reduce((sum, value) => {
+      const match = String(value).match(/^(\d+)(?:\((\d+)\))?$/);
+      if (!match) {
+        return sum;
+      }
+      const question = analysis[match[1]];
+      const points = match[2] ? question?.parts?.[match[2]] : question?.points;
+      return sum + (Number(points) || 0);
+    }, 0);
   return Math.max(0, Math.round((Number(test.maxScore) - deduction) * 10) / 10);
 }
 
@@ -1007,12 +1052,16 @@ function pastExamSummaryForStudent(data, className, studentName, month = "") {
       : null,
     tests: tests.map(({ test, result }) => {
       const questionAnalysis = normalizeQuestionAnalysis(test.questionAnalysis);
-      const wrongDetails = result.wrongQuestions.map((number) => ({
-        number,
-        points: questionAnalysis[String(number)]?.points || null,
-        topic: questionAnalysis[String(number)]?.topic || "",
-        type: questionAnalysis[String(number)]?.type || "",
-      }));
+      const wrongDetails = result.wrongQuestions.map((value) => {
+        const match = String(value).match(/^(\d+)(?:\((\d+)\))?$/);
+        const question = match ? questionAnalysis[match[1]] : null;
+        return {
+          number: value,
+          points: match?.[2] ? question?.parts?.[match[2]] || null : question?.points || null,
+          topic: question?.topic || "",
+          type: question?.type || "",
+        };
+      });
       const weakTypeMap = new Map();
       wrongDetails.forEach((question) => {
         const label = question.type || question.topic;

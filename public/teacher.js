@@ -835,18 +835,27 @@ function parseWrongQuestionInput(value) {
   const numbers = [];
   const invalid = [];
   tokens.forEach((token) => {
-    const match = token.match(/^(\d+)(?:번)?$/);
+    const match = token.match(/^(\d+)(?:\((\d+)\))?(?:번)?$/);
     if (!match) {
       invalid.push(token);
       return;
     }
     const number = Number(match[1]);
-    if (!numbers.includes(number)) {
-      numbers.push(number);
+    const normalized = match[2] ? `${number}(${Number(match[2])})` : number;
+    if (!numbers.includes(normalized)) {
+      numbers.push(normalized);
     }
   });
-  numbers.sort((left, right) => left - right);
-  return { provided: true, numbers, invalid };
+  const wholeQuestions = new Set(numbers.filter((value) => typeof value === "number"));
+  const normalizedNumbers = numbers.filter(
+    (value) => typeof value === "number" || !wholeQuestions.has(Number(String(value).match(/^\d+/)?.[0])),
+  );
+  normalizedNumbers.sort((left, right) => {
+    const leftMatch = String(left).match(/^(\d+)(?:\((\d+)\))?$/);
+    const rightMatch = String(right).match(/^(\d+)(?:\((\d+)\))?$/);
+    return Number(leftMatch[1]) - Number(rightMatch[1]) || Number(leftMatch[2] || 0) - Number(rightMatch[2] || 0);
+  });
+  return { provided: true, numbers: normalizedNumbers, invalid };
 }
 
 function questionAnalysisFor(test) {
@@ -873,15 +882,25 @@ function calculatedPastExamResult(test, rawValue) {
     return { ...parsed, score: null, details: [], unknown: [] };
   }
   const analysis = questionAnalysisFor(test);
-  const unknown = parsed.numbers.filter((number) => !analysis[String(number)]);
-  const details = parsed.numbers
-    .map((number) => ({ number, ...analysis[String(number)] }))
-    .filter((question) => Number.isFinite(Number(question.points)));
-  const deduction = details.reduce((sum, question) => sum + Number(question.points), 0);
+  const details = parsed.numbers.map((value) => {
+    const match = String(value).match(/^(\d+)(?:\((\d+)\))?$/);
+    const question = match ? analysis[match[1]] : null;
+    const points = match?.[2] ? question?.parts?.[match[2]] : question?.points;
+    return {
+      number: value,
+      points,
+      topic: question?.topic || "",
+      type: question?.type || "",
+      valid: Boolean(question) && Number.isFinite(Number(points)),
+    };
+  });
+  const unknown = details.filter((question) => !question.valid).map((question) => question.number);
+  const validDetails = details.filter((question) => question.valid);
+  const deduction = validDetails.reduce((sum, question) => sum + Number(question.points), 0);
   return {
     ...parsed,
     unknown,
-    details,
+    details: validDetails,
     score: parsed.invalid.length || unknown.length
       ? null
       : Math.max(0, Math.round((Number(test.maxScore) - deduction) * 10) / 10),
