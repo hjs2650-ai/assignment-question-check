@@ -86,7 +86,9 @@
       const requestedClass = params.get("class") || params.get("c") || "";
       const requestedPath = params.get("to") || CLASS_ROUTES[requestedClass] || "/";
       const destinationPath = requestedPath.startsWith("/") ? requestedPath : `/${requestedPath}`;
-      const destination = `${RENDER_BASE}${destinationPath}`;
+      const destinationUrl = new URL(`${RENDER_BASE}${destinationPath}`);
+      destinationUrl.searchParams.set("entry", "loader");
+      const destination = destinationUrl.href;
       const statusText = document.querySelector("#statusText");
       const className = document.querySelector("#className");
       const dailyNote = document.querySelector("#dailyNote");

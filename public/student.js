@@ -123,9 +123,10 @@ let materialsLoaded = false;
 let studentHistoryReady = false;
 let allowStudentExit = false;
 let activeStudentHistoryState = null;
+let studentExitHistoryDepth = 2;
 
 const STUDENT_MAIN_VIEWS = new Set(["home", "assignment", "records", "videos", "materials"]);
-const STUDENT_HISTORY_VERSION = 3;
+const STUDENT_HISTORY_VERSION = 4;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -373,6 +374,7 @@ function normalizedStudentHistoryState(value = {}) {
     studentApp: true,
     studentHistoryVersion: STUDENT_HISTORY_VERSION,
     exitGuard: value.exitGuard !== false,
+    exitHistoryDepth: value.exitHistoryDepth === 3 ? 3 : studentExitHistoryDepth,
     view,
     materialId,
   };
@@ -391,6 +393,7 @@ function studentHistoryStateFromUrl() {
 function studentUrlForState(state) {
   const normalized = normalizedStudentHistoryState(state);
   const url = new URL(location.href);
+  url.searchParams.delete("entry");
   url.searchParams.delete("view");
   url.searchParams.delete("material");
   if (normalized.view !== "home") {
@@ -403,13 +406,12 @@ function studentUrlForState(state) {
 }
 
 function initializeStudentHistory() {
-  if (history.state?.studentApp && history.state.studentHistoryVersion === STUDENT_HISTORY_VERSION) {
-    const current = normalizedStudentHistoryState(history.state);
-    activeStudentHistoryState = current;
-    studentHistoryReady = true;
-    return current;
+  if (studentHistoryReady) {
+    return normalizedStudentHistoryState(activeStudentHistoryState || history.state || { view: "home" });
   }
 
+  const params = new URLSearchParams(location.search);
+  studentExitHistoryDepth = params.get("entry") === "loader" || history.state?.exitHistoryDepth === 3 ? 3 : 2;
   const requested = studentHistoryStateFromUrl();
   const exitMarker = normalizedStudentHistoryState({ view: "home", exitGuard: false });
   history.replaceState(exitMarker, "", studentUrlForState(exitMarker));
@@ -955,7 +957,6 @@ async function bootstrapStudentApp() {
   if (!targetClassName) {
     throw new Error("반 정보를 확인하지 못했습니다.");
   }
-  initializeStudentHistory();
   const session = await sessionOrNull();
   if (!session || session.className !== targetClassName) {
     showStudentLogin();
@@ -1579,7 +1580,7 @@ studentExitLeave.addEventListener("click", () => {
   hideStudentExitConfirm();
   allowStudentExit = true;
   const currentUrl = location.href;
-  history.go(-2);
+  history.go(-studentExitHistoryDepth);
   window.setTimeout(() => {
     if (location.href === currentUrl) {
       location.replace("about:blank");
