@@ -1578,7 +1578,13 @@ studentExitStay.addEventListener("click", hideStudentExitConfirm);
 studentExitLeave.addEventListener("click", () => {
   hideStudentExitConfirm();
   allowStudentExit = true;
+  const currentUrl = location.href;
   history.go(-2);
+  window.setTimeout(() => {
+    if (location.href === currentUrl) {
+      location.replace("about:blank");
+    }
+  }, 700);
 });
 
 studentRecordTabs.forEach((button) => {

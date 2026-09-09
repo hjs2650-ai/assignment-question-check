@@ -97,12 +97,20 @@ async function api(path, options = {}) {
   return payload;
 }
 
+const STUDENT_LOADER_URL = "https://hjs2650-ai.github.io/assignment-question-check/";
+
+function studentLoaderUrl(path) {
+  const url = new URL(STUDENT_LOADER_URL);
+  url.searchParams.set("to", path);
+  return url.toString();
+}
+
 function studentUrl(id) {
-  return `${location.origin}/student/${id}`;
+  return studentLoaderUrl(`/student/${id}`);
 }
 
 function classUrl(className) {
-  return `${location.origin}/class/${encodeURIComponent(className)}`;
+  return studentLoaderUrl(`/class/${className}`);
 }
 
 function escapeHtml(value) {

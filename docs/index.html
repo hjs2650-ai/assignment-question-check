@@ -57,6 +57,17 @@
       </section>
     </main>
 
+    <section id="loaderExitConfirm" class="loader-exit-confirm" hidden role="dialog" aria-modal="true" aria-labelledby="loaderExitConfirmTitle">
+      <div class="loader-exit-confirm-panel">
+        <strong id="loaderExitConfirmTitle">학생관리 화면을 나가시겠습니까?</strong>
+        <p>계속 이용하려면 아래 버튼을 눌러 주세요.</p>
+        <div class="loader-exit-confirm-actions">
+          <button id="loaderExitStay" type="button">계속 보기</button>
+          <button id="loaderExitLeave" type="button">나가기</button>
+        </div>
+      </div>
+    </section>
+
     <script>
       const RENDER_BASE = "https://assignment-question-check.onrender.com";
       const CLASS_ROUTES = {
@@ -79,6 +90,9 @@
       const statusText = document.querySelector("#statusText");
       const className = document.querySelector("#className");
       const dailyNote = document.querySelector("#dailyNote");
+      const loaderExitConfirm = document.querySelector("#loaderExitConfirm");
+      const loaderExitStay = document.querySelector("#loaderExitStay");
+      const loaderExitLeave = document.querySelector("#loaderExitLeave");
       const dailyNotes = [
         "오늘도 좋은 하루 보내자!",
         "오늘도 화이팅!",
@@ -145,7 +159,7 @@
         for (let attempt = 0; attempt < 8; attempt += 1) {
           statusText.textContent = messages[Math.min(attempt, messages.length - 1)];
           if (await pingRender()) {
-            location.replace(destination);
+            location.assign(destination);
             return;
           }
           await wait(1200);
@@ -153,10 +167,43 @@
 
         statusText.textContent = "조금 오래 걸리고 있습니다. 화면으로 이동합니다.";
         await wait(800);
-        location.replace(destination);
+        location.assign(destination);
       }
 
-      start();
+      function showExitConfirm() {
+        loaderExitConfirm.hidden = false;
+        loaderExitStay.focus();
+      }
+
+      loaderExitStay.addEventListener("click", () => {
+        loaderExitConfirm.hidden = true;
+        statusText.textContent = "학생관리 화면으로 이동합니다.";
+        location.assign(destination);
+      });
+
+      loaderExitLeave.addEventListener("click", () => {
+        loaderExitConfirm.hidden = true;
+        const currentUrl = location.href;
+        history.back();
+        window.setTimeout(() => {
+          if (location.href === currentUrl) {
+            location.replace("about:blank");
+          }
+        }, 700);
+      });
+
+      const navigationEntry = performance.getEntriesByType("navigation")[0];
+      if (navigationEntry?.type === "back_forward") {
+        showExitConfirm();
+      } else {
+        start();
+      }
+
+      window.addEventListener("pageshow", (event) => {
+        if (event.persisted) {
+          showExitConfirm();
+        }
+      });
     </script>
   </body>
 </html>

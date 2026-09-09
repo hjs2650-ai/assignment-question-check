@@ -21,6 +21,64 @@ body {
   max-width: 100%;
 }
 
+.loader-exit-confirm[hidden] {
+  display: none !important;
+}
+
+.loader-exit-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(25 31 46 / 54%);
+}
+
+.loader-exit-confirm-panel {
+  width: min(100%, 360px);
+  padding: 24px;
+  border: 1px solid #e7cbc3;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgb(31 35 48 / 24%);
+  text-align: center;
+}
+
+.loader-exit-confirm-panel strong {
+  display: block;
+  color: #27334a;
+  font-size: 20px;
+}
+
+.loader-exit-confirm-panel p {
+  margin: 10px 0 20px;
+  color: #697386;
+  font-size: 14px;
+}
+
+.loader-exit-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.loader-exit-confirm-actions button {
+  min-height: 44px;
+  border: 1px solid #d9b0a5;
+  border-radius: 6px;
+  background: #fff;
+  color: #975b4e;
+  font: inherit;
+  cursor: pointer;
+}
+
+.loader-exit-confirm-actions button:first-child {
+  border-color: #d68172;
+  background: #d68172;
+  color: #fff;
+}
+
 body {
   min-height: 100vh;
   margin: 0;
