@@ -68,6 +68,9 @@ const studentMaterialViewerTitle = document.querySelector("#studentMaterialViewe
 const studentMaterialFrame = document.querySelector("#studentMaterialFrame");
 const studentMaterialFullscreen = document.querySelector("#studentMaterialFullscreen");
 const studentMaterialClose = document.querySelector("#studentMaterialClose");
+const studentExitConfirm = document.querySelector("#studentExitConfirm");
+const studentExitStay = document.querySelector("#studentExitStay");
+const studentExitLeave = document.querySelector("#studentExitLeave");
 const studentMaterialsEmpty = document.querySelector("#studentMaterialsEmpty");
 const studentMaterialsMessage = document.querySelector("#studentMaterialsMessage");
 const studentGreetingName = document.querySelector("#studentGreetingName");
@@ -122,7 +125,7 @@ let allowStudentExit = false;
 let activeStudentHistoryState = null;
 
 const STUDENT_MAIN_VIEWS = new Set(["home", "assignment", "records", "videos", "materials"]);
-const STUDENT_HISTORY_VERSION = 2;
+const STUDENT_HISTORY_VERSION = 3;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -439,6 +442,7 @@ function replaceStudentHistoryView(view) {
 }
 
 function navigateStudentMainView(view) {
+  hideStudentExitConfirm();
   hideStudentMaterial();
   const nextState = normalizedStudentHistoryState({ view });
   const currentState = normalizedStudentHistoryState(activeStudentHistoryState || history.state || { view: "home" });
@@ -457,6 +461,18 @@ function navigateStudentMainView(view) {
     return;
   }
   history.replaceState(nextState, "", studentUrlForState(nextState));
+}
+
+function hideStudentExitConfirm() {
+  studentExitConfirm.hidden = true;
+}
+
+function showStudentExitConfirm() {
+  if (!studentExitConfirm.hidden) {
+    return;
+  }
+  studentExitConfirm.hidden = false;
+  studentExitStay.focus();
 }
 
 function materialDateLabel(value) {
@@ -1515,6 +1531,10 @@ studentMainTabs.forEach((button) => {
 
 studentMaterialClose.addEventListener("click", closeStudentMaterial);
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !studentExitConfirm.hidden) {
+    hideStudentExitConfirm();
+    return;
+  }
   if (event.key === "Escape" && !studentMaterialFullscreen.hidden) {
     closeStudentMaterial();
   }
@@ -1549,15 +1569,16 @@ window.addEventListener("popstate", (event) => {
     return;
   }
 
-  const shouldExit = window.confirm("학생관리 화면을 나가시겠습니까?");
-  if (shouldExit) {
-    allowStudentExit = true;
-    history.back();
-    return;
-  }
-
   const restoreState = normalizedStudentHistoryState(activeStudentHistoryState || { view: "home" });
   history.pushState(restoreState, "", studentUrlForState(restoreState));
+  showStudentExitConfirm();
+});
+
+studentExitStay.addEventListener("click", hideStudentExitConfirm);
+studentExitLeave.addEventListener("click", () => {
+  hideStudentExitConfirm();
+  allowStudentExit = true;
+  history.go(-2);
 });
 
 studentRecordTabs.forEach((button) => {
