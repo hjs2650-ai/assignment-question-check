@@ -122,6 +122,7 @@ let allowStudentExit = false;
 let activeStudentHistoryState = null;
 
 const STUDENT_MAIN_VIEWS = new Set(["home", "assignment", "records", "videos", "materials"]);
+const STUDENT_HISTORY_VERSION = 2;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -367,6 +368,7 @@ function normalizedStudentHistoryState(value = {}) {
   const materialId = view === "materials" ? String(value.materialId || "").trim() : "";
   return {
     studentApp: true,
+    studentHistoryVersion: STUDENT_HISTORY_VERSION,
     exitGuard: value.exitGuard !== false,
     view,
     materialId,
@@ -398,7 +400,7 @@ function studentUrlForState(state) {
 }
 
 function initializeStudentHistory() {
-  if (history.state?.studentApp) {
+  if (history.state?.studentApp && history.state.studentHistoryVersion === STUDENT_HISTORY_VERSION) {
     const current = normalizedStudentHistoryState(history.state);
     activeStudentHistoryState = current;
     studentHistoryReady = true;
@@ -1527,6 +1529,22 @@ window.addEventListener("popstate", (event) => {
       studentMaterialsMessage.className = "message error";
       studentMaterialsMessage.textContent = error.message;
     });
+    return;
+  }
+
+  const currentState = normalizedStudentHistoryState(activeStudentHistoryState || { view: "home" });
+  if (currentState.materialId) {
+    const materialListState = normalizedStudentHistoryState({ view: "materials" });
+    activeStudentHistoryState = materialListState;
+    history.pushState(materialListState, "", studentUrlForState(materialListState));
+    applyStudentHistoryState(materialListState).catch(() => {});
+    return;
+  }
+  if (currentState.view !== "home") {
+    const homeState = normalizedStudentHistoryState({ view: "home" });
+    activeStudentHistoryState = homeState;
+    history.pushState(homeState, "", studentUrlForState(homeState));
+    applyStudentHistoryState(homeState).catch(() => {});
     return;
   }
 
