@@ -117,6 +117,11 @@ let loadedClassVideos = [];
 let classVideoScope = "month";
 let loadedMaterials = [];
 let materialsLoaded = false;
+let studentHistoryReady = false;
+let allowStudentExit = false;
+let activeStudentHistoryState = null;
+
+const STUDENT_MAIN_VIEWS = new Set(["home", "assignment", "records", "videos", "materials"]);
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -357,6 +362,101 @@ function setStudentMainView(view) {
   }
 }
 
+function normalizedStudentHistoryState(value = {}) {
+  const view = STUDENT_MAIN_VIEWS.has(value.view) ? value.view : "home";
+  const materialId = view === "materials" ? String(value.materialId || "").trim() : "";
+  return {
+    studentApp: true,
+    exitGuard: value.exitGuard !== false,
+    view,
+    materialId,
+  };
+}
+
+function studentHistoryStateFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const materialId = String(params.get("material") || "").trim();
+  const requestedView = params.get("view");
+  return normalizedStudentHistoryState({
+    view: materialId ? "materials" : requestedView,
+    materialId,
+  });
+}
+
+function studentUrlForState(state) {
+  const normalized = normalizedStudentHistoryState(state);
+  const url = new URL(location.href);
+  url.searchParams.delete("view");
+  url.searchParams.delete("material");
+  if (normalized.view !== "home") {
+    url.searchParams.set("view", normalized.view);
+  }
+  if (normalized.materialId) {
+    url.searchParams.set("material", normalized.materialId);
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function initializeStudentHistory() {
+  if (history.state?.studentApp) {
+    const current = normalizedStudentHistoryState(history.state);
+    activeStudentHistoryState = current;
+    studentHistoryReady = true;
+    return current;
+  }
+
+  const requested = studentHistoryStateFromUrl();
+  const exitMarker = normalizedStudentHistoryState({ view: "home", exitGuard: false });
+  history.replaceState(exitMarker, "", studentUrlForState(exitMarker));
+
+  const homeState = normalizedStudentHistoryState({ view: "home" });
+  history.pushState(homeState, "", studentUrlForState(homeState));
+
+  const requestedListView = requested.materialId ? "materials" : requested.view;
+  if (requestedListView !== "home") {
+    const listState = normalizedStudentHistoryState({ view: requestedListView });
+    history.pushState(listState, "", studentUrlForState(listState));
+  }
+
+  if (requested.materialId) {
+    history.pushState(requested, "", studentUrlForState(requested));
+  }
+
+  activeStudentHistoryState = requested;
+  studentHistoryReady = true;
+  return requested;
+}
+
+function replaceStudentHistoryView(view) {
+  if (!studentHistoryReady) {
+    return;
+  }
+  const state = normalizedStudentHistoryState({ view });
+  activeStudentHistoryState = state;
+  history.replaceState(state, "", studentUrlForState(state));
+}
+
+function navigateStudentMainView(view) {
+  hideStudentMaterial();
+  const nextState = normalizedStudentHistoryState({ view });
+  const currentState = normalizedStudentHistoryState(activeStudentHistoryState || history.state || { view: "home" });
+  if (!studentHistoryReady) {
+    setStudentMainView(nextState.view);
+    return;
+  }
+  if (nextState.view === "home" && currentState.view !== "home") {
+    history.back();
+    return;
+  }
+  setStudentMainView(nextState.view);
+  activeStudentHistoryState = nextState;
+  if (currentState.view === "home" && nextState.view !== "home") {
+    history.pushState(nextState, "", studentUrlForState(nextState));
+    return;
+  }
+  history.replaceState(nextState, "", studentUrlForState(nextState));
+}
+
 function materialDateLabel(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -368,23 +468,55 @@ function materialDateLabel(value) {
   }).format(date);
 }
 
-function selectStudentMaterial(materialId) {
+function selectStudentMaterial(materialId, { updateHistory = true } = {}) {
   const material = loadedMaterials.find((item) => item.id === materialId);
   if (!material) {
-    return;
+    return false;
   }
   studentMaterialViewerTitle.textContent = material.title;
   studentMaterialFrame.title = `${material.title} 열람`;
   studentMaterialFrame.src = material.previewUrl;
   studentMaterialFullscreen.hidden = false;
   document.body.classList.add("material-viewer-open");
+  if (updateHistory && studentHistoryReady) {
+    const state = normalizedStudentHistoryState({ view: "materials", materialId: material.id });
+    activeStudentHistoryState = state;
+    history.pushState(state, "", studentUrlForState(state));
+  }
   studentMaterialClose.focus();
+  return true;
 }
 
-function closeStudentMaterial() {
+function hideStudentMaterial() {
   studentMaterialFullscreen.hidden = true;
   studentMaterialFrame.removeAttribute("src");
   document.body.classList.remove("material-viewer-open");
+}
+
+function closeStudentMaterial() {
+  if (studentHistoryReady && history.state?.studentApp && history.state.materialId) {
+    history.back();
+    return;
+  }
+  hideStudentMaterial();
+  setStudentMainView("materials");
+  replaceStudentHistoryView("materials");
+}
+
+async function applyStudentHistoryState(value) {
+  const state = normalizedStudentHistoryState(value);
+  activeStudentHistoryState = state;
+  hideStudentMaterial();
+  setStudentMainView(state.view);
+  if (!state.materialId) {
+    return;
+  }
+  await loadStudentMaterials();
+  if (!selectStudentMaterial(state.materialId, { updateHistory: false })) {
+    const listState = normalizedStudentHistoryState({ view: "materials" });
+    activeStudentHistoryState = listState;
+    history.replaceState(listState, "", studentUrlForState(listState));
+  }
 }
 
 function renderStudentMaterials() {
@@ -783,9 +915,11 @@ async function openStudentApp(session) {
   studentAuthLoading.hidden = true;
   studentLoginGate.hidden = true;
   studentApp.hidden = false;
-  setStudentMainView("home");
+  const restoredHistoryState = initializeStudentHistory();
+  setStudentMainView(restoredHistoryState.view);
   await loadAssignment();
   await Promise.allSettled([loadStudentRecords(true), loadStudentHomeStatus()]);
+  await applyStudentHistoryState(restoredHistoryState);
 }
 
 loginStudentName.addEventListener("input", () => {
@@ -1333,7 +1467,7 @@ nameInput.addEventListener("input", () => {
 });
 
 function openAssignmentView(mode = "current") {
-  setStudentMainView("assignment");
+  navigateStudentMainView("assignment");
   setSubmissionMode(mode);
   document.querySelector("#studentAssignmentView").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1343,13 +1477,13 @@ homeQuestionButton.addEventListener("click", () => openAssignmentView("current")
 homePastAssignmentButton.addEventListener("click", () => openAssignmentView("past"));
 homeMissingAlert.addEventListener("click", () => {
   if (homeMissingAlert.classList.contains("is-clear")) {
-    setStudentMainView("records");
+    navigateStudentMainView("records");
     return;
   }
   openAssignmentView("past");
   loadStudentMissingStatus();
 });
-homeVideoAlert.addEventListener("click", () => setStudentMainView("videos"));
+homeVideoAlert.addEventListener("click", () => navigateStudentMainView("videos"));
 classVideosMonthButton.addEventListener("click", () => {
   classVideoScope = "month";
   renderClassVideos();
@@ -1365,7 +1499,7 @@ homeViewButtons.forEach((button) => {
       openAssignmentView("current");
       return;
     }
-    setStudentMainView(view);
+    navigateStudentMainView(view);
     if (view === "records" && button.dataset.recordSection) {
       setStudentRecordSection(button.dataset.recordSection);
     }
@@ -1373,7 +1507,7 @@ homeViewButtons.forEach((button) => {
 });
 
 studentMainTabs.forEach((button) => {
-  button.addEventListener("click", () => setStudentMainView(button.dataset.view));
+  button.addEventListener("click", () => navigateStudentMainView(button.dataset.view));
 });
 
 studentMaterialClose.addEventListener("click", closeStudentMaterial);
@@ -1381,6 +1515,30 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !studentMaterialFullscreen.hidden) {
     closeStudentMaterial();
   }
+});
+
+window.addEventListener("popstate", (event) => {
+  if (!activeStudentSession || allowStudentExit) {
+    return;
+  }
+
+  if (event.state?.studentApp && event.state.exitGuard !== false) {
+    applyStudentHistoryState(event.state).catch((error) => {
+      studentMaterialsMessage.className = "message error";
+      studentMaterialsMessage.textContent = error.message;
+    });
+    return;
+  }
+
+  const shouldExit = window.confirm("학생관리 화면을 나가시겠습니까?");
+  if (shouldExit) {
+    allowStudentExit = true;
+    history.back();
+    return;
+  }
+
+  const restoreState = normalizedStudentHistoryState(activeStudentHistoryState || { view: "home" });
+  history.pushState(restoreState, "", studentUrlForState(restoreState));
 });
 
 studentRecordTabs.forEach((button) => {
@@ -1429,6 +1587,11 @@ studentLogoutButton.addEventListener("click", async () => {
   try {
     await api("/api/student/logout", { method: "POST", body: "{}" });
   } finally {
+    allowStudentExit = true;
+    const cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete("view");
+    cleanUrl.searchParams.delete("material");
+    history.replaceState(null, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
     location.reload();
   }
 });
