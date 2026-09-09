@@ -939,6 +939,7 @@ async function bootstrapStudentApp() {
   if (!targetClassName) {
     throw new Error("반 정보를 확인하지 못했습니다.");
   }
+  initializeStudentHistory();
   const session = await sessionOrNull();
   if (!session || session.className !== targetClassName) {
     showStudentLogin();
@@ -1520,7 +1521,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("popstate", (event) => {
-  if (!activeStudentSession || allowStudentExit) {
+  if (!studentHistoryReady || allowStudentExit) {
     return;
   }
 
