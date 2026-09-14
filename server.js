@@ -942,6 +942,10 @@ function normalizedScore(value) {
   return { score: Number.isFinite(score) ? score : null, absent: false, note: "", wrongQuestions: [] };
 }
 
+function isClinicTest(test) {
+  return /클리닉/i.test(normalizeText(test && test.name));
+}
+
 function publicTest(test, students = []) {
   return {
     id: test.id,
@@ -966,6 +970,7 @@ function testSummaryForStudent(data, className, studentName, month = "") {
       (test) =>
         test.className === targetClass &&
         test.kind === "test" &&
+        !isClinicTest(test) &&
         (!month || test.date.startsWith(`${month}-`)),
     )
     .map((test) => ({ test, result: normalizedScore(test.scores[studentName]) }))
@@ -1037,7 +1042,7 @@ function pastExamSummaryForStudent(data, className, studentName, month = "") {
     .filter(
       (test) =>
         test.className === targetClass &&
-        test.kind === "past_exam" &&
+        (test.kind === "past_exam" || isClinicTest(test)) &&
         (!month || test.date.startsWith(`${month}-`)),
     )
     .map((test) => ({ test, result: normalizedScore(test.scores[studentName]) }))
@@ -1052,6 +1057,10 @@ function pastExamSummaryForStudent(data, className, studentName, month = "") {
       : null,
     tests: tests.map(({ test, result }) => {
       const questionAnalysis = normalizeQuestionAnalysis(test.questionAnalysis);
+      const classPercentages = studentsForClass(data, targetClass)
+        .map((student) => normalizedScore(test.scores && test.scores[student]))
+        .filter((score) => score.score !== null)
+        .map((score) => (score.score / test.maxScore) * 100);
       const wrongDetails = result.wrongQuestions.map((value) => {
         const match = String(value).match(/^(\d+)(?:\((\d+)\))?$/);
         const question = match ? questionAnalysis[match[1]] : null;
@@ -1078,6 +1087,7 @@ function pastExamSummaryForStudent(data, className, studentName, month = "") {
         date: test.date,
         name: test.name,
         kind: "past_exam",
+        assessmentType: isClinicTest(test) ? "clinic" : "past_exam",
         maxScore: test.maxScore,
         topics: normalizeLabelList(test.topics),
         estimatedGradeCutoffs: normalizeEstimatedGradeCutoffs(test.estimatedGradeCutoffs, test.maxScore),
@@ -1089,9 +1099,112 @@ function pastExamSummaryForStudent(data, className, studentName, month = "") {
         wrongDetails,
         weakTypes: [...weakTypeMap.values()].sort((left, right) => right.count - left.count || left.type.localeCompare(right.type)),
         percent: result.score === null ? null : Math.round((result.score / test.maxScore) * 1000) / 10,
+        classPercent: classPercentages.length
+          ? Math.round((classPercentages.reduce((sum, value) => sum + value, 0) / classPercentages.length) * 10) / 10
+          : null,
       };
     }),
   };
+}
+
+function assessmentSummaryForStudent(data, className, studentName, month = "") {
+  const combined = pastExamSummaryForStudent(data, className, studentName, month);
+  const summarize = (assessmentType) => {
+    const tests = combined.tests.filter((test) => test.assessmentType === assessmentType);
+    const percentages = tests
+      .filter((test) => test.percent !== null)
+      .map((test) => test.percent);
+    return {
+      count: percentages.length,
+      averagePercent: percentages.length
+        ? Math.round((percentages.reduce((sum, value) => sum + value, 0) / percentages.length) * 10) / 10
+        : null,
+      tests,
+    };
+  };
+  return {
+    count: combined.count,
+    averagePercent: combined.averagePercent,
+    pastExams: summarize("past_exam"),
+    clinics: summarize("clinic"),
+  };
+}
+
+function assessmentAnalysisForStudent(data, className, studentName, month) {
+  const targetClass = normalizeClassName(className);
+  const topicMap = new Map();
+  const weaknessMap = new Map();
+  const tests = data.tests
+    .filter(
+      (test) =>
+        test.className === targetClass &&
+        (test.kind === "past_exam" || isClinicTest(test)) &&
+        test.date.startsWith(`${month}-`),
+    )
+    .map((test) => ({ test, result: normalizedScore(test.scores && test.scores[studentName]) }))
+    .filter(({ result }) => result.score !== null);
+
+  tests.forEach(({ test, result }) => {
+    const analysis = normalizeQuestionAnalysis(test.questionAnalysis);
+    const wrongSet = new Set(result.wrongQuestions.map(String));
+
+    Object.entries(analysis).forEach(([number, question]) => {
+      const topic = normalizeText(question.topic) || "단원 확인 중";
+      const partNumbers = Object.keys(question.parts || {});
+      const itemNumbers = partNumbers.length ? partNumbers.map((part) => `${number}(${part})`) : [number];
+      const row = topicMap.get(topic) || { topic, total: 0, wrong: 0 };
+      itemNumbers.forEach((itemNumber) => {
+        row.total += 1;
+        if (wrongSet.has(number) || wrongSet.has(itemNumber)) {
+          row.wrong += 1;
+        }
+      });
+      topicMap.set(topic, row);
+    });
+
+    result.wrongQuestions.forEach((wrongNumber) => {
+      const match = String(wrongNumber).match(/^(\d+)(?:\((\d+)\))?$/);
+      const question = match ? analysis[match[1]] : null;
+      const topic = normalizeText(question && question.topic) || "단원 확인 중";
+      const type = normalizeText(question && question.type) || "유형 확인 중";
+      const key = `${topic}\u0000${type}`;
+      const row = weaknessMap.get(key) || { topic, type, count: 0, sources: [] };
+      row.count += 1;
+      row.sources.push({
+        testId: test.id,
+        testName: test.name,
+        date: test.date,
+        number: String(wrongNumber),
+        assessmentType: isClinicTest(test) ? "clinic" : "past_exam",
+      });
+      weaknessMap.set(key, row);
+    });
+  });
+
+  const topicOrder = ["평면좌표", "직선의 방정식", "원의 방정식", "도형의 이동", "집합", "명제"];
+  const topics = [...topicMap.values()]
+    .map((row) => ({
+      ...row,
+      correct: Math.max(0, row.total - row.wrong),
+      percent: row.total ? Math.round(((row.total - row.wrong) / row.total) * 1000) / 10 : null,
+    }))
+    .sort((left, right) => {
+      const leftIndex = topicOrder.indexOf(left.topic);
+      const rightIndex = topicOrder.indexOf(right.topic);
+      if (leftIndex !== -1 || rightIndex !== -1) {
+        return (leftIndex === -1 ? topicOrder.length : leftIndex) - (rightIndex === -1 ? topicOrder.length : rightIndex);
+      }
+      return left.topic.localeCompare(right.topic, "ko");
+    });
+  const weaknesses = [...weaknessMap.values()]
+    .map((row) => ({
+      ...row,
+      sources: row.sources.sort((left, right) => right.date.localeCompare(left.date)),
+    }))
+    .sort((left, right) => right.count - left.count || left.topic.localeCompare(right.topic, "ko") || left.type.localeCompare(right.type, "ko"))
+    .slice(0, 6);
+
+  return { topics, weaknesses };
 }
 
 function classTestComparisonForStudent(data, className, studentName, month = "") {
@@ -1102,6 +1215,7 @@ function classTestComparisonForStudent(data, className, studentName, month = "")
       (test) =>
         test.className === targetClass &&
         test.kind === "test" &&
+        !isClinicTest(test) &&
         (!month || test.date.startsWith(`${month}-`)),
     )
     .map((test) => {
@@ -1156,6 +1270,7 @@ function topicAnalysisForStudent(data, className, studentName, month) {
       (test) =>
         test.className === targetClass &&
         test.kind === "test" &&
+        !isClinicTest(test) &&
         test.date.startsWith(`${month}-`),
     )
     .forEach((test) => {
@@ -1225,6 +1340,8 @@ function monthlySummary(data, className, month) {
     attendance: attendanceSummaryForStudent(data, targetClass, studentName, monthValue),
     tests: testSummaryForStudent(data, targetClass, studentName, monthValue),
     pastExams: pastExamSummaryForStudent(data, targetClass, studentName, monthValue),
+    evaluations: assessmentSummaryForStudent(data, targetClass, studentName, monthValue),
+    assessmentLearning: assessmentAnalysisForStudent(data, targetClass, studentName, monthValue),
     classComparison: classTestComparisonForStudent(data, targetClass, studentName, monthValue),
     relearning: relearningSummaryForStudent(data, targetClass, studentName, monthValue),
     learning: topicAnalysisForStudent(data, targetClass, studentName, monthValue),

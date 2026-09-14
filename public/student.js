@@ -97,12 +97,20 @@ const studentRecordOverview = document.querySelector("#studentRecordOverview");
 const studentRecordTests = document.querySelector("#studentRecordTests");
 const studentRecordAttendance = document.querySelector("#studentRecordAttendance");
 const studentRecordSummary = document.querySelector("#studentRecordSummary");
+const studentPastExamTrend = document.querySelector("#studentPastExamTrend");
+const studentPastExamAverage = document.querySelector("#studentPastExamAverage");
+const studentPastExamTrendChart = document.querySelector("#studentPastExamTrendChart");
+const studentClinicTrend = document.querySelector("#studentClinicTrend");
+const studentClinicAverage = document.querySelector("#studentClinicAverage");
+const studentClinicTrendChart = document.querySelector("#studentClinicTrendChart");
 const studentScoreTrend = document.querySelector("#studentScoreTrend");
 const studentScoreTrendChart = document.querySelector("#studentScoreTrendChart");
+const studentAssessmentWeakness = document.querySelector("#studentAssessmentWeakness");
 const studentLearningAnalysis = document.querySelector("#studentLearningAnalysis");
 const studentAttendanceHistory = document.querySelector("#studentAttendanceHistory");
 const studentTestHistory = document.querySelector("#studentTestHistory");
 const studentPastExamHistory = document.querySelector("#studentPastExamHistory");
+const studentClinicHistory = document.querySelector("#studentClinicHistory");
 const studentRelearningHistory = document.querySelector("#studentRelearningHistory");
 const studentRecordsMessage = document.querySelector("#studentRecordsMessage");
 
@@ -581,14 +589,23 @@ function renderStudentHomeSummary(payload) {
   const homework = payload.homework || {};
   const attendance = payload.attendance || {};
   const monthlyTests = payload.tests || {};
+  const monthlyEvaluations = payload.evaluations || {};
   const homeworkRate = Number.isFinite(Number(homework.rate)) ? Number(homework.rate) : 0;
 
   updateMonthTriggers(payload.month);
   homeHomeworkValue.textContent = `${homework.submitted || 0} / ${homework.total || 0}`;
   homeAttendanceValue.textContent = `${attendance.attended || 0} / ${attendance.total || 0}`;
-  homeTestValue.textContent = monthlyTests.averagePercent === null || monthlyTests.averagePercent === undefined
+  const evaluationScores = [
+    ...((monthlyTests.tests || []).filter((test) => test.percent !== null).map((test) => Number(test.percent))),
+    ...((monthlyEvaluations.pastExams?.tests || []).filter((test) => test.percent !== null).map((test) => Number(test.percent))),
+    ...((monthlyEvaluations.clinics?.tests || []).filter((test) => test.percent !== null).map((test) => Number(test.percent))),
+  ].filter(Number.isFinite);
+  const evaluationAverage = evaluationScores.length
+    ? Math.round((evaluationScores.reduce((sum, value) => sum + value, 0) / evaluationScores.length) * 10) / 10
+    : null;
+  homeTestValue.textContent = evaluationAverage === null
     ? "기록 없음"
-    : `${monthlyTests.averagePercent}%`;
+    : `${evaluationAverage}%`;
   homeProgressValue.textContent = homework.rate === null || homework.rate === undefined ? "-" : `${homework.rate}%`;
   homeProgressBar.style.width = `${Math.max(0, Math.min(100, homeworkRate))}%`;
 }
@@ -690,29 +707,309 @@ function renderScoreTrend(tests = []) {
   studentScoreTrendChart.scrollLeft = 0;
 }
 
+function displayScoreNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "-";
+  }
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
+function renderPastExamTrend(summary = {}) {
+  const rows = (summary.tests || [])
+    .filter((test) => !test.absent && test.percent !== null)
+    .slice()
+    .reverse();
+  studentPastExamTrend.hidden = rows.length === 0;
+  studentPastExamAverage.textContent = rows.length
+    ? `${rows.length}회 · 평균 ${displayScoreNumber(summary.averagePercent)}점`
+    : "";
+  if (!rows.length) {
+    studentPastExamTrendChart.innerHTML = "";
+    return;
+  }
+
+  const width = Math.max(640, rows.length * 155);
+  const height = 300;
+  const left = 46;
+  const right = 34;
+  const top = 30;
+  const bottom = 58;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const xAt = (index) => left + (rows.length === 1 ? plotWidth / 2 : (plotWidth * index) / (rows.length - 1));
+  const yAt = (percent) => top + ((100 - Math.max(0, Math.min(100, percent))) / 100) * plotHeight;
+  const cutoffPercent = (test, grade) => {
+    const score = Number(test.estimatedGradeCutoffs?.[String(grade)]);
+    const maximum = Number(test.maxScore);
+    return Number.isFinite(score) && Number.isFinite(maximum) && maximum > 0 ? (score / maximum) * 100 : null;
+  };
+  const grid = [100, 80, 60, 40, 20, 0].map((value) => {
+    const y = yAt(value);
+    return `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" /><text x="${left - 8}" y="${y + 4}" text-anchor="end">${value}</text>`;
+  }).join("");
+  const cutoffSeries = [1, 2, 3, 4].map((grade) => {
+    const points = rows
+      .map((test, index) => {
+        const percent = cutoffPercent(test, grade);
+        return percent === null ? null : { test, x: xAt(index), y: yAt(percent) };
+      })
+      .filter(Boolean);
+    if (!points.length) {
+      return "";
+    }
+    const line = points.length > 1
+      ? `<polyline class="grade-cutoff-line grade-${grade}" points="${points.map((point) => `${point.x},${point.y}`).join(" ")}" />`
+      : "";
+    const dots = points.map((point) => `
+      <g class="grade-cutoff-dots grade-${grade}">
+        <circle cx="${point.x}" cy="${point.y}" r="4" />
+        <text x="${point.x + 7}" y="${point.y - 7}">${escapeHtml(displayScoreNumber(point.test.estimatedGradeCutoffs[String(grade)]))}</text>
+      </g>
+    `).join("");
+    return line + dots;
+  }).join("");
+  const scorePoints = rows.map((test, index) => `${xAt(index)},${yAt(test.percent)}`).join(" ");
+  const scoreDots = rows.map((test, index) => {
+    const x = xAt(index);
+    const y = yAt(test.percent);
+    return `
+      <g class="past-exam-score-dot">
+        <circle cx="${x}" cy="${y}" r="7" />
+        <text x="${x}" y="${Math.max(17, y - 13)}" text-anchor="middle">${escapeHtml(displayScoreNumber(test.score))}</text>
+        <text class="assessment-date" x="${x}" y="${height - 31}" text-anchor="middle">${escapeHtml(displayIsoDate(test.date))}</text>
+        <text class="assessment-name" x="${x}" y="${height - 13}" text-anchor="middle">${escapeHtml(test.name.replace(/\s*기출.*$/u, ""))}</text>
+      </g>
+    `;
+  }).join("");
+
+  studentPastExamTrendChart.innerHTML = `
+    <div class="assessment-chart-legend grade-legend" aria-label="기출시험 그래프 범례">
+      <span class="mine"><i></i>내 점수</span>
+      ${[1, 2, 3, 4].map((grade) => `<span class="grade-${grade}"><i></i>예상 ${grade}등급컷</span>`).join("")}
+    </div>
+    <svg viewBox="0 0 ${width} ${height}" style="width:${width}px" role="img" aria-label="기출시험 점수와 예상 등급컷 그래프">
+      <g class="score-grid">${grid}</g>
+      ${cutoffSeries}
+      <polyline class="past-exam-score-line" points="${scorePoints}" />
+      ${scoreDots}
+    </svg>
+  `;
+  studentPastExamTrendChart.scrollLeft = 0;
+}
+
+function renderClinicTrend(summary = {}) {
+  const rows = (summary.tests || [])
+    .filter((test) => !test.absent && test.percent !== null)
+    .slice()
+    .reverse();
+  studentClinicTrend.hidden = rows.length === 0;
+  studentClinicAverage.textContent = rows.length
+    ? `${rows.length}회 · 평균 ${displayScoreNumber(summary.averagePercent)}점`
+    : "";
+  if (!rows.length) {
+    studentClinicTrendChart.innerHTML = "";
+    return;
+  }
+
+  const width = Math.max(620, rows.length * 130);
+  const height = 270;
+  const left = 44;
+  const right = 28;
+  const top = 28;
+  const bottom = 54;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const groupWidth = plotWidth / rows.length;
+  const yAt = (percent) => top + ((100 - Math.max(0, Math.min(100, percent))) / 100) * plotHeight;
+  const grid = [100, 80, 60, 40, 20, 0].map((value) => {
+    const y = yAt(value);
+    return `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" /><text x="${left - 8}" y="${y + 4}" text-anchor="end">${value}</text>`;
+  }).join("");
+  const bars = rows.map((test, index) => {
+    const center = left + groupWidth * index + groupWidth / 2;
+    const mineY = yAt(test.percent);
+    const classPercent = test.classPercent === null ? null : Number(test.classPercent);
+    const classY = classPercent === null ? null : yAt(classPercent);
+    return `
+      <g class="clinic-bar-group">
+        <rect class="clinic-bar-mine" x="${center - 24}" y="${mineY}" width="20" height="${top + plotHeight - mineY}" rx="4" />
+        <text class="clinic-value mine" x="${center - 14}" y="${Math.max(16, mineY - 7)}" text-anchor="middle">${escapeHtml(displayScoreNumber(test.percent))}</text>
+        ${classY === null ? "" : `
+          <rect class="clinic-bar-class" x="${center + 4}" y="${classY}" width="20" height="${top + plotHeight - classY}" rx="4" />
+          <text class="clinic-value" x="${center + 14}" y="${Math.max(16, classY - 7)}" text-anchor="middle">${escapeHtml(displayScoreNumber(classPercent))}</text>
+        `}
+        <text class="assessment-date" x="${center}" y="${height - 27}" text-anchor="middle">${escapeHtml(displayIsoDate(test.date))}</text>
+        <text class="assessment-name" x="${center}" y="${height - 10}" text-anchor="middle">클리닉</text>
+      </g>
+    `;
+  }).join("");
+  studentClinicTrendChart.innerHTML = `
+    <div class="assessment-chart-legend" aria-label="클리닉 그래프 범례">
+      <span class="mine"><i></i>내 점수</span><span class="class-average"><i></i>반 평균</span>
+    </div>
+    <svg viewBox="0 0 ${width} ${height}" style="width:${width}px" role="img" aria-label="클리닉 점수와 반 평균 그래프">
+      <g class="score-grid">${grid}</g>${bars}
+    </svg>
+  `;
+  studentClinicTrendChart.scrollLeft = 0;
+}
+
+function renderAssessmentWeakness(analysis = {}, hasEvaluations = false) {
+  const weaknesses = analysis.weaknesses || [];
+  studentAssessmentWeakness.hidden = !hasEvaluations;
+  if (!hasEvaluations) {
+    studentAssessmentWeakness.innerHTML = "";
+    return;
+  }
+  studentAssessmentWeakness.innerHTML = `
+    <div class="student-analysis-heading"><div><h3>취약 단원과 유형</h3></div></div>
+    ${weaknesses.length ? `
+      <div class="student-weakness-list">
+        ${weaknesses.map((row, index) => {
+          const visibleSources = row.sources.slice(0, 3);
+          return `
+            <details class="student-weakness-card" ${index === 0 ? "open" : ""}>
+              <summary>
+                <span class="student-weakness-rank">${index + 1}</span>
+                <span class="student-weakness-title"><strong>${escapeHtml(row.topic)}</strong><small>${escapeHtml(row.type)}</small></span>
+                <span class="student-weakness-count"><b>${escapeHtml(row.count)}회</b> 오답</span>
+              </summary>
+              <div class="student-weakness-sources">
+                ${visibleSources.map((source) => `<span>${escapeHtml(displayIsoDate(source.date))} ${escapeHtml(source.testName)} · ${escapeHtml(source.number)}번</span>`).join("")}
+                ${row.sources.length > visibleSources.length ? `<small>외 ${row.sources.length - visibleSources.length}개 문항</small>` : ""}
+              </div>
+            </details>
+          `;
+        }).join("")}
+      </div>
+    ` : `<p class="student-perfect-result student-assessment-perfect">이번 달 기출시험과 클리닉에서 틀린 문항이 없습니다.</p>`}
+  `;
+}
+
+function renderAssessmentTopics(analysis = {}) {
+  const topicRows = analysis.topics || [];
+  studentLearningAnalysis.hidden = topicRows.length === 0;
+  studentLearningAnalysis.innerHTML = topicRows.length ? `
+    <div class="student-analysis-heading"><div><h3>전체 단원 성취도</h3></div></div>
+    <div class="topic-achievement-list">
+      ${topicRows.map((row) => `
+        <div class="topic-achievement-row ${row.percent >= 80 ? "is-strong" : row.percent >= 60 ? "is-steady" : "is-focus"}">
+          <div><strong>${escapeHtml(row.topic)}</strong><span>${escapeHtml(row.percent)}% · ${escapeHtml(row.correct)}/${escapeHtml(row.total)}문항</span></div>
+          <div class="topic-achievement-track"><i style="width:${Math.max(0, Math.min(100, row.percent))}%"></i></div>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+}
+
+function assessmentHistoryHtml(tests = [], assessmentType = "past_exam") {
+  if (!tests.length) {
+    return `<p class="muted">등록된 ${assessmentType === "clinic" ? "클리닉" : "기출 테스트"} 결과가 아직 없습니다.</p>`;
+  }
+  return tests.map((test) => {
+    const classDifference = test.classPercent === null || test.percent === null
+      ? null
+      : Math.round((test.percent - test.classPercent) * 10) / 10;
+    const resultLabel = assessmentType === "clinic"
+      ? (classDifference === null
+        ? "반 평균 확인 중"
+        : classDifference === 0
+          ? "반 평균과 같음"
+          : `반 평균보다 ${displayScoreNumber(Math.abs(classDifference))}점 ${classDifference > 0 ? "높음" : "낮음"}`)
+      : (test.estimatedGrade ? `예상 ${test.estimatedGrade}등급` : "등급컷 확인 중");
+    return `
+      <article class="student-past-exam-card ${assessmentType === "clinic" ? "is-clinic" : ""}">
+        <div class="student-history-row test-history-row past-exam-history-row">
+          <div>
+            <strong>${escapeHtml(test.name)}</strong>
+            <small>${escapeHtml(displayIsoDate(test.date))}</small>
+            ${(test.topics || []).length ? `<small class="test-topic-list">${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
+          </div>
+          <span>${test.absent ? "미응시" : `${escapeHtml(test.score)} / ${escapeHtml(test.maxScore)}`}</span>
+          <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>
+        </div>
+        ${!test.absent && test.score !== null ? `
+          ${assessmentType === "past_exam" && test.estimatedGradeCutoffs && Object.keys(test.estimatedGradeCutoffs).length === 4 ? `
+            <section class="student-estimated-grade">
+              <div class="student-estimated-grade-result">
+                <span>현재 점수 기준</span>
+                <strong>${escapeHtml(resultLabel)}</strong>
+                <small>5등급제 · 실제 등급컷은 학교 성적 분포에 따라 달라질 수 있습니다.</small>
+              </div>
+              <div class="student-grade-cutoff-list" aria-label="예상 등급컷">
+                ${[1, 2, 3, 4].map((grade) => `
+                  <div class="${Number(test.estimatedGrade) === grade ? "is-current" : ""}">
+                    <span>${grade}등급</span>
+                    <strong>${escapeHtml(test.estimatedGradeCutoffs[String(grade)])}점 이상</strong>
+                  </div>
+                `).join("")}
+                <div class="${Number(test.estimatedGrade) === 5 ? "is-current" : ""}">
+                  <span>5등급</span>
+                  <strong>${escapeHtml(test.estimatedGradeCutoffs["4"])}점 미만</strong>
+                </div>
+              </div>
+            </section>
+          ` : `<p class="student-assessment-result-label">${escapeHtml(resultLabel)}</p>`}
+          <div class="student-past-exam-analysis">
+            <strong>틀린 문항과 유형</strong>
+            ${(test.wrongDetails || []).length ? `
+              <div class="student-wrong-question-list">
+                ${test.wrongDetails.map((question) => `
+                  <div>
+                    <span>${escapeHtml(question.number)}번</span>
+                    <p>${escapeHtml(question.type || question.topic || "유형 확인 중")}</p>
+                    ${question.points ? `<small>-${escapeHtml(question.points)}점</small>` : ""}
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<p class="student-perfect-result">틀린 문항 없음</p>`}
+          </div>
+        ` : ""}
+      </article>
+    `;
+  }).join("");
+}
+
 function renderStudentRecords(payload) {
   const homework = payload.homework || {};
   const attendance = payload.attendance || { counts: {}, rows: [] };
   const monthlyTests = payload.tests || { tests: [] };
+  const evaluations = payload.evaluations || { count: 0, pastExams: { tests: [] }, clinics: { tests: [] } };
+  const assessmentLearning = payload.assessmentLearning || { topics: [], weaknesses: [] };
   const cumulativeTests = payload.cumulativeTests || { tests: [] };
   const cumulativePastExams = payload.cumulativePastExams || { tests: [] };
   const cumulativeRelearning = payload.cumulativeRelearning || { rows: [] };
   const classComparison = payload.classComparison || { level: "unavailable", label: "비교할 기록이 아직 없어요" };
-  studentRecordSummary.innerHTML = `
-    <div class="comparison-summary comparison-${escapeHtml(classComparison.level)}">
-      <span>반 평균과 비교</span>
-      <strong class="comparison-label">${escapeHtml(classComparison.label)}</strong>
-      <small>이번 달 테스트 결과</small>
-    </div>
-  `;
+  const hasAssessments = Number(evaluations.count) > 0;
+  studentRecordSummary.innerHTML = hasAssessments
+    ? `
+      <div><span>응시한 평가</span><strong>${escapeHtml(evaluations.count)}회</strong></div>
+      <div><span>평균 점수</span><strong>${escapeHtml(displayScoreNumber(evaluations.averagePercent))}점</strong></div>
+      <div><span>기출시험</span><strong>${escapeHtml(evaluations.pastExams?.count || 0)}회</strong><small>${evaluations.pastExams?.averagePercent === null ? "기록 없음" : `평균 ${escapeHtml(displayScoreNumber(evaluations.pastExams.averagePercent))}점`}</small></div>
+      <div><span>클리닉</span><strong>${escapeHtml(evaluations.clinics?.count || 0)}회</strong><small>${evaluations.clinics?.averagePercent === null ? "기록 없음" : `평균 ${escapeHtml(displayScoreNumber(evaluations.clinics.averagePercent))}점`}</small></div>
+    `
+    : `
+      <div class="comparison-summary comparison-${escapeHtml(classComparison.level)}">
+        <span>반 평균과 비교</span>
+        <strong class="comparison-label">${escapeHtml(classComparison.label)}</strong>
+        <small>이번 달 테스트 결과</small>
+      </div>
+    `;
 
+  renderPastExamTrend(evaluations.pastExams || {});
+  renderClinicTrend(evaluations.clinics || {});
   renderScoreTrend(monthlyTests.tests || []);
+  renderAssessmentWeakness(assessmentLearning, hasAssessments);
 
   const learning = payload.learning || {};
   const topicRows = learning.topics || [];
   const weakTypes = learning.weakTypes || [];
-  studentLearningAnalysis.hidden = topicRows.length === 0 && weakTypes.length === 0;
-  studentLearningAnalysis.innerHTML = topicRows.length || weakTypes.length
+  if (hasAssessments) {
+    renderAssessmentTopics(assessmentLearning);
+  } else {
+    studentLearningAnalysis.hidden = topicRows.length === 0 && weakTypes.length === 0;
+    studentLearningAnalysis.innerHTML = topicRows.length || weakTypes.length
     ? `
       <div class="student-analysis-heading">
         <div>
@@ -742,6 +1039,7 @@ function renderStudentRecords(payload) {
       ` : ""}
     `
     : "";
+  }
 
   studentAttendanceHistory.innerHTML = attendance.rows?.length
     ? attendance.rows
@@ -777,62 +1075,15 @@ function renderStudentRecords(payload) {
         .join("")
     : `<p class="muted">등록된 테스트 결과가 아직 없습니다.</p>`;
 
-  studentPastExamHistory.innerHTML = cumulativePastExams.tests?.length
-    ? cumulativePastExams.tests
-        .map(
-          (test) => `
-            <article class="student-past-exam-card">
-              <div class="student-history-row test-history-row past-exam-history-row">
-                <div>
-                  <strong>${escapeHtml(test.name)}</strong>
-                  <small>${escapeHtml(displayIsoDate(test.date))}</small>
-                  ${(test.topics || []).length ? `<small class="test-topic-list">${test.topics.map(escapeHtml).join(" · ")}</small>` : ""}
-                </div>
-                <span>${test.absent ? "미응시" : `${escapeHtml(test.score)} / ${escapeHtml(test.maxScore)}`}</span>
-                <em>${test.percent === null ? "-" : `${escapeHtml(test.percent)}%`}</em>
-              </div>
-              ${!test.absent && test.score !== null ? `
-                ${test.estimatedGradeCutoffs && Object.keys(test.estimatedGradeCutoffs).length === 4 ? `
-                  <section class="student-estimated-grade">
-                    <div class="student-estimated-grade-result">
-                      <span>현재 점수 기준</span>
-                      <strong>예상 ${escapeHtml(test.estimatedGrade)}등급</strong>
-                      <small>5등급제 · 실제 등급컷은 학교 성적 분포에 따라 달라질 수 있습니다.</small>
-                    </div>
-                    <div class="student-grade-cutoff-list" aria-label="예상 등급컷">
-                      ${[1, 2, 3, 4].map((grade) => `
-                        <div class="${Number(test.estimatedGrade) === grade ? "is-current" : ""}">
-                          <span>${grade}등급</span>
-                          <strong>${escapeHtml(test.estimatedGradeCutoffs[String(grade)])}점 이상</strong>
-                        </div>
-                      `).join("")}
-                      <div class="${Number(test.estimatedGrade) === 5 ? "is-current" : ""}">
-                        <span>5등급</span>
-                        <strong>${escapeHtml(test.estimatedGradeCutoffs["4"])}점 미만</strong>
-                      </div>
-                    </div>
-                  </section>
-                ` : ""}
-                <div class="student-past-exam-analysis">
-                  <strong>틀린 문항과 유형</strong>
-                  ${(test.wrongDetails || []).length ? `
-                    <div class="student-wrong-question-list">
-                      ${test.wrongDetails.map((question) => `
-                        <div>
-                          <span>${escapeHtml(question.number)}번</span>
-                          <p>${escapeHtml(question.type || question.topic || "유형 확인 중")}</p>
-                          ${question.points ? `<small>-${escapeHtml(question.points)}점</small>` : ""}
-                        </div>
-                      `).join("")}
-                    </div>
-                  ` : `<p class="student-perfect-result">틀린 문항 없음</p>`}
-                </div>
-              ` : ""}
-            </article>
-          `,
-        )
-        .join("")
-    : `<p class="muted">등록된 기출 테스트 결과가 아직 없습니다.</p>`;
+  const cumulativeAssessmentTests = cumulativePastExams.tests || [];
+  studentPastExamHistory.innerHTML = assessmentHistoryHtml(
+    cumulativeAssessmentTests.filter((test) => test.assessmentType !== "clinic"),
+    "past_exam",
+  );
+  studentClinicHistory.innerHTML = assessmentHistoryHtml(
+    cumulativeAssessmentTests.filter((test) => test.assessmentType === "clinic"),
+    "clinic",
+  );
 
   studentRelearningHistory.innerHTML = cumulativeRelearning.rows?.length
     ? cumulativeRelearning.rows

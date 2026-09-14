@@ -88,7 +88,7 @@
               <strong id="homeAttendanceValue">확인 중</strong>
             </button>
             <button class="student-dashboard-stat tests" type="button" data-home-view="records" data-record-section="overview">
-              <span>이번 달 테스트 평균</span>
+              <span>이번 달 평가 평균</span>
               <strong id="homeTestValue">확인 중</strong>
             </button>
             <button class="student-dashboard-stat videos" type="button" data-home-view="videos">
@@ -314,12 +314,32 @@
             </div>
           </div>
           <nav class="student-record-tabs" aria-label="내 기록 메뉴">
-            <button class="student-record-tab is-active" type="button" data-record-section="overview" aria-selected="true">테스트 분석</button>
+            <button class="student-record-tab is-active" type="button" data-record-section="overview" aria-selected="true">성적 분석</button>
             <button class="student-record-tab" type="button" data-record-section="tests" aria-selected="false">성적 기록</button>
             <button class="student-record-tab" type="button" data-record-section="attendance" aria-selected="false">출결</button>
           </nav>
           <section id="studentRecordOverview">
             <div id="studentRecordSummary" class="student-record-summary"></div>
+            <section id="studentPastExamTrend" class="student-assessment-section student-past-exam-trend" hidden>
+              <div class="student-analysis-heading">
+                <div>
+                  <p class="eyebrow">기출시험</p>
+                  <h3>점수와 예상 등급컷</h3>
+                </div>
+                <span id="studentPastExamAverage" class="student-assessment-badge"></span>
+              </div>
+              <div id="studentPastExamTrendChart" class="student-score-trend-chart student-grade-trend-chart"></div>
+            </section>
+            <section id="studentClinicTrend" class="student-assessment-section student-clinic-trend" hidden>
+              <div class="student-analysis-heading">
+                <div>
+                  <p class="eyebrow">클리닉</p>
+                  <h3>내 점수와 반 평균</h3>
+                </div>
+                <span id="studentClinicAverage" class="student-assessment-badge"></span>
+              </div>
+              <div id="studentClinicTrendChart" class="student-score-trend-chart student-clinic-trend-chart"></div>
+            </section>
             <section id="studentScoreTrend" class="student-score-trend" hidden>
               <div class="student-analysis-heading">
                 <div>
@@ -330,6 +350,7 @@
               </div>
               <div id="studentScoreTrendChart" class="student-score-trend-chart"></div>
             </section>
+            <section id="studentAssessmentWeakness" class="student-assessment-weakness" hidden></section>
             <section id="studentLearningAnalysis" class="student-learning-analysis" hidden></section>
           </section>
           <section id="studentRecordTests" hidden>
@@ -337,6 +358,10 @@
               <section>
                 <h3>기출 테스트 기록</h3>
                 <div id="studentPastExamHistory" class="student-history-list"></div>
+              </section>
+              <section>
+                <h3>클리닉 기록</h3>
+                <div id="studentClinicHistory" class="student-history-list"></div>
               </section>
               <section>
                 <h3>테스트 누적 기록</h3>

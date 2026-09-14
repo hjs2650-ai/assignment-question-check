@@ -1916,6 +1916,29 @@ summary {
   padding: 18px 0;
 }
 
+.student-assessment-section {
+  margin: 0 0 24px;
+  border-top: 5px solid var(--student-coral, #d78572);
+  border-bottom: 1px solid var(--student-line, var(--line));
+  padding: 18px 0;
+}
+
+.student-assessment-section.student-clinic-trend {
+  border-top-color: #72ad8d;
+}
+
+.student-assessment-badge {
+  border-radius: 6px !important;
+  padding: 7px 10px !important;
+  background: var(--student-coral-soft, #fff3ef) !important;
+  color: var(--student-coral-dark, #a65042) !important;
+}
+
+.student-clinic-trend .student-assessment-badge {
+  background: var(--student-mint-soft, #eff8f3) !important;
+  color: #39735d !important;
+}
+
 .student-analysis-heading {
   display: flex;
   align-items: end;
@@ -1990,6 +2013,101 @@ summary {
   display: block;
   max-width: none;
 }
+
+.assessment-chart-legend {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  width: fit-content;
+  gap: 8px 14px;
+  margin: 1px 8px 4px;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--student-muted, var(--muted));
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.assessment-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assessment-chart-legend i {
+  width: 20px;
+  border-top: 3px solid #6f9dce;
+}
+
+.assessment-chart-legend .mine {
+  color: #bd2443;
+  font-size: 14px;
+}
+
+.assessment-chart-legend .mine i {
+  border-top: 5px solid #eb3f63;
+}
+
+.assessment-chart-legend .class-average i {
+  border-top-color: #579b80;
+}
+
+.grade-legend .grade-1 i { border-top-color: #668ec4; }
+.grade-legend .grade-2 i { border-top-color: #579b80; }
+.grade-legend .grade-3 i { border-top-color: #d1a953; }
+.grade-legend .grade-4 i { border-top-color: #9a8aab; }
+
+.grade-cutoff-line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-dasharray: 7 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.78;
+}
+
+.grade-cutoff-line.grade-1 { stroke: #668ec4; }
+.grade-cutoff-line.grade-2 { stroke: #579b80; }
+.grade-cutoff-line.grade-3 { stroke: #d1a953; }
+.grade-cutoff-line.grade-4 { stroke: #9a8aab; }
+
+.grade-cutoff-dots circle { fill: #fff; stroke-width: 2.5; }
+.grade-cutoff-dots.grade-1 circle { stroke: #668ec4; }
+.grade-cutoff-dots.grade-2 circle { stroke: #579b80; }
+.grade-cutoff-dots.grade-3 circle { stroke: #d1a953; }
+.grade-cutoff-dots.grade-4 circle { stroke: #9a8aab; }
+.grade-cutoff-dots text { fill: #665f68; font-size: 10px; font-weight: 800; }
+
+.past-exam-score-line {
+  fill: none;
+  stroke: #eb3f63;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.past-exam-score-dot circle {
+  fill: #eb3f63;
+  stroke: #fff;
+  stroke-width: 4;
+}
+
+.past-exam-score-dot > text:not(.assessment-date):not(.assessment-name) {
+  fill: #bd2443;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.assessment-date { fill: #49434b; font-size: 12px; font-weight: 900; }
+.assessment-name { fill: #857d84; font-size: 10px; }
+
+.clinic-bar-mine { fill: #eb3f63; }
+.clinic-bar-class { fill: #579b80; opacity: 0.82; }
+.clinic-value { fill: #39735d; font-size: 11px; font-weight: 900; }
+.clinic-value.mine { fill: #bd2443; font-size: 13px; }
 
 .score-chart-legend {
   position: sticky;
@@ -2075,7 +2193,7 @@ summary {
 }
 
 .student-record-test-columns {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .student-record-single-column {
@@ -2257,6 +2375,84 @@ summary {
   color: #176958;
   font-weight: 800;
 }
+
+.student-assessment-result-label {
+  width: fit-content;
+  margin: 3px 4px 10px;
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: var(--student-mint-soft, #eff8f3);
+  color: #39735d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.student-assessment-weakness {
+  margin: 0 0 24px;
+  border-top: 1px solid var(--student-line, var(--line));
+  border-bottom: 1px solid var(--student-line, var(--line));
+  padding: 18px 0;
+}
+
+.student-weakness-list {
+  display: grid;
+  gap: 9px;
+}
+
+.student-weakness-card {
+  border: 1px solid var(--student-line, var(--line));
+  border-radius: 7px;
+  background: #fff;
+}
+
+.student-weakness-card summary {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.student-weakness-card summary::-webkit-details-marker { display: none; }
+
+.student-weakness-rank {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--student-coral-soft, #fff3ef);
+  color: var(--student-coral-dark, #a65042);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.student-weakness-title {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.student-weakness-title strong { font-size: 15px; }
+.student-weakness-title small { color: var(--student-muted, var(--muted)); line-height: 1.35; }
+.student-weakness-count { color: var(--student-coral-dark, #a65042); font-size: 12px; white-space: nowrap; }
+.student-weakness-count b { font-size: 18px; }
+
+.student-weakness-sources {
+  display: grid;
+  gap: 5px;
+  margin: 0 12px 12px 56px;
+  border-left: 3px solid #82aee0;
+  padding: 9px 11px;
+  background: var(--student-blue-soft, #f2f7fd);
+  color: #53677f;
+  font-size: 12px;
+}
+
+.student-weakness-sources small { color: var(--student-muted, var(--muted)); }
+.student-assessment-perfect { padding: 13px; background: var(--student-mint-soft, #eff8f3); }
 
 .student-learning-analysis {
   margin: 0 0 24px;
@@ -4182,6 +4378,24 @@ body[data-theme="night"] .range-text {
 
   #homePastAssignmentButton {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .assessment-chart-legend {
+    gap: 7px 10px;
+  }
+
+  .student-weakness-card summary {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .student-weakness-count {
+    grid-column: 2;
+  }
+
+  .student-weakness-sources {
+    margin: 0 10px 10px;
   }
 }
 
