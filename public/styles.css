@@ -1143,10 +1143,44 @@ button:disabled {
   user-select: none;
 }
 
-.check-cell input {
-  width: 18px;
-  height: 18px;
+.check-cell input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: 0 0 22px;
+  place-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0 2px 0 0;
   padding: 0;
+  border: 2px solid #9b8f8b;
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.check-cell input[type="checkbox"]::before {
+  content: "";
+  width: 6px;
+  height: 11px;
+  border: solid #fff;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg) scale(0);
+  transform-origin: center;
+}
+
+.check-cell input[type="checkbox"]:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.check-cell input[type="checkbox"]:checked::before {
+  transform: rotate(45deg) scale(1);
+}
+
+.check-cell input[type="checkbox"]:focus-visible {
+  outline: 3px solid rgba(217, 125, 106, 0.3);
+  outline-offset: 2px;
 }
 
 .check-cell:has(input:checked) {
