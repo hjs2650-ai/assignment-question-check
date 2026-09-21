@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>과제 클리어체크</title>
+    <meta name="description" content="도와줘요 쌤 문제를 체크하고 과제 사진이나 동영상을 첨부해 주세요." />
+    <meta property="og:title" content="과제 클리어체크" />
+    <meta property="og:description" content="도와줘요 쌤 문제를 체크하고 과제 사진이나 동영상을 첨부해 주세요." />
+    <meta property="og:image" content="/assets/teacher-character.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="과제 클리어체크" />
+    <meta name="twitter:description" content="도와줘요 쌤 문제를 체크하고 과제 사진이나 동영상을 첨부해 주세요." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css?v=20260921-checkbox" />
+  </head>
+  <body class="student-app-body">
+    <section id="studentAuthLoading" class="student-auth-loading">
+      <img src="/assets/teacher-character.png" alt="" />
+      <strong>학생 정보를 확인하고 있어요.</strong>
+    </section>
+
+    <section id="studentLoginGate" class="student-login-gate" hidden>
+      <div class="student-login-card">
+        <img src="/assets/teacher-character.png" alt="" />
+        <div>
+          <p class="eyebrow">황종선T 학생관리</p>
+          <h1>내 학습 기록 로그인</h1>
+          <p id="loginClassName" class="muted"></p>
+        </div>
+        <form id="studentLoginForm">
+          <label>
+            이름
+            <input id="loginStudentName" autocomplete="username" placeholder="본인 이름을 정확히 입력해 주세요." required />
+            <span id="loginSchoolName" class="login-school-name" hidden></span>
+          </label>
+          <label>
+            비밀번호
+            <input id="loginStudentPassword" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" placeholder="숫자 4자리" required />
+          </label>
+          <button class="primary full" type="submit">로그인</button>
+          <p class="muted login-help">한 번 로그인하면 이 기기에서는 계속 로그인 상태가 유지됩니다.</p>
+          <p id="studentLoginMessage" class="message"></p>
+        </form>
+      </div>
+    </section>
+
+    <main id="studentApp" class="student-shell student-dashboard-shell" hidden>
+      <header class="student-dashboard-header">
+        <div class="student-dashboard-brand">
+          <img src="/assets/teacher-character.png" alt="" />
+          <div>
+            <strong>황종선T 학생관리</strong>
+            <span id="loggedInClassName">반 확인 중</span>
+          </div>
+        </div>
+        <div class="student-dashboard-profile">
+          <div>
+            <strong id="loggedInStudentName"></strong>
+            <span id="loggedInSchoolName" hidden></span>
+          </div>
+          <button id="studentLogoutButton" type="button">로그아웃</button>
+        </div>
+      </header>
+      <input id="studentRecordMonth" class="student-shared-month-input" type="month" aria-label="기록 월 선택" tabindex="-1" />
+
+      <section id="studentHomeView" class="student-main-view student-home-view">
+        <section class="student-dashboard-welcome">
+          <span class="student-dashboard-today">TODAY</span>
+          <h1><span id="studentGreetingName"></span>아, 오늘도 하나씩 클리어!</h1>
+          <p>이번 과제까지 하면 이번 주 미션 완료야.</p>
+        </section>
+
+        <section class="student-dashboard-main">
+          <div class="student-dashboard-section-head">
+            <h2>내 학습 한눈에</h2>
+            <button id="studentDashboardMonth" class="student-month-trigger" type="button">이번 달 기록</button>
+          </div>
+          <div class="student-dashboard-stats">
+            <button class="student-dashboard-stat homework" type="button" data-home-view="assignment">
+              <span>과제 완료</span>
+              <strong id="homeHomeworkValue">확인 중</strong>
+            </button>
+            <button class="student-dashboard-stat attendance" type="button" data-home-view="records" data-record-section="attendance">
+              <span>이번 달 출석</span>
+              <strong id="homeAttendanceValue">확인 중</strong>
+            </button>
+            <button class="student-dashboard-stat tests" type="button" data-home-view="records" data-record-section="overview">
+              <span>이번 달 평가 평균</span>
+              <strong id="homeTestValue">확인 중</strong>
+            </button>
+            <button class="student-dashboard-stat videos" type="button" data-home-view="videos">
+              <span>이번 달 수업영상</span>
+              <strong id="homeVideoValue">확인 중</strong>
+            </button>
+          </div>
+
+          <section class="student-dashboard-progress">
+            <div>
+              <strong>이번 달 과제 현황</strong>
+              <div class="student-dashboard-track"><span id="homeProgressBar"></span></div>
+            </div>
+            <b id="homeProgressValue">-</b>
+          </section>
+
+          <div class="student-dashboard-content">
+            <section>
+              <div class="student-dashboard-section-head compact">
+                <h2>지금 할 과제</h2>
+                <button id="homePastAssignmentButton" type="button">지난 과제</button>
+              </div>
+              <div class="student-dashboard-assignment">
+                <div class="student-dashboard-assignment-top">
+                  <div>
+                    <span id="className" class="student-dashboard-assignment-label">이번 과제</span>
+                    <h3 id="title" class="student-dashboard-assignment-title">과제 불러오는 중</h3>
+                    <p id="rangeText" class="student-dashboard-assignment-range"></p>
+                  </div>
+                  <span id="homeAssignmentStatus" class="student-dashboard-due">확인 중</span>
+                </div>
+                <p id="detail" class="student-dashboard-detail"></p>
+                <div class="student-dashboard-actions">
+                  <button id="homeStartAssignmentButton" type="button">과제 시작</button>
+                  <button id="homeQuestionButton" type="button">질문 번호 보기</button>
+                </div>
+              </div>
+            </section>
+            <aside>
+              <div class="student-dashboard-section-head compact">
+                <h2>최근 확인</h2>
+              </div>
+              <button id="homeMissingAlert" class="student-dashboard-alert missing" type="button">
+                <strong>미제출 과제를 확인하고 있어요</strong>
+                <span>잠시만 기다려 주세요.</span>
+              </button>
+              <button id="homeVideoAlert" class="student-dashboard-alert video" type="button">
+                <strong>수업 영상을 확인하고 있어요</strong>
+                <span>새 영상이 있으면 여기에 표시됩니다.</span>
+              </button>
+            </aside>
+          </div>
+        </section>
+      </section>
+
+      <section id="studentVideoView" class="student-main-view" hidden>
+        <section id="classVideos" class="class-videos" hidden aria-labelledby="classVideosTitle">
+          <div class="class-videos-head">
+            <div>
+              <p class="eyebrow">다시 보는 수업</p>
+              <h2 id="classVideosTitle">수업 영상</h2>
+            </div>
+            <div class="class-video-scope" aria-label="수업영상 범위">
+              <button id="classVideosMonthButton" class="is-active" type="button">이번 달 영상</button>
+              <button id="classVideosToggle" type="button">전체 영상</button>
+            </div>
+          </div>
+          <div id="classVideoList" class="class-video-list"></div>
+        </section>
+        <section id="videoEmptyState" class="panel student-empty-state" hidden>
+          <strong>등록된 수업 영상이 아직 없어요.</strong>
+          <span class="muted">새 영상이 등록되면 이곳에 나타납니다.</span>
+        </section>
+      </section>
+
+      <section id="studentMaterialsView" class="student-main-view" hidden>
+        <section class="panel student-materials-panel">
+          <div class="student-materials-head">
+            <div>
+              <p class="eyebrow">수업 자료 모아보기</p>
+              <h2>학습자료</h2>
+            </div>
+            <span id="studentMaterialCount" class="badge">0개</span>
+          </div>
+          <div id="studentMaterialsWorkspace" class="student-materials-workspace" hidden>
+            <div id="studentMaterialList" class="student-material-list"></div>
+          </div>
+          <div id="studentMaterialsEmpty" class="student-empty-state">
+            <strong>등록된 학습자료가 아직 없어요.</strong>
+          </div>
+          <p id="studentMaterialsMessage" class="message"></p>
+        </section>
+      </section>
+
+      <section id="studentAssignmentView" class="student-main-view" hidden>
+      <section class="student-assignment-context">
+        <span>이번 과제</span>
+        <h2 id="assignmentViewTitle">과제 불러오는 중</h2>
+        <p id="assignmentViewRange"></p>
+      </section>
+      <section class="panel">
+        <form id="responseForm">
+          <label>
+            이름
+            <input id="studentName" placeholder="예: 홍길동" autocomplete="name" required />
+          </label>
+          <label id="studentPasswordWrap" class="student-password-field" hidden>
+            비밀번호
+            <input
+              id="studentPassword"
+              type="password"
+              inputmode="numeric"
+              pattern="[0-9]{4}"
+              maxlength="4"
+              autocomplete="current-password"
+              placeholder="숫자 4자리"
+            />
+            <small>선생님이 비밀번호를 설정한 학생만 입력합니다.</small>
+          </label>
+          <section id="studentMissingCheck" class="student-missing-check">
+            <div>
+              <strong>내 과제 확인</strong>
+              <span class="muted">미제출 과제와 내가 체크한 질문 번호를 확인할 수 있어요.</span>
+            </div>
+            <button id="checkMissingBtn" class="ghost" type="button">확인하기</button>
+          </section>
+          <div id="studentMissingResult" class="student-missing-result" hidden></div>
+          <div id="submissionTabs" class="submission-tabs" role="tablist" aria-label="과제 제출 종류">
+            <button id="currentSubmissionTab" class="submission-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="currentSubmissionPanel">오늘 과제 제출</button>
+            <button id="pastSubmissionTab" class="submission-tab" type="button" role="tab" aria-selected="false" aria-controls="pastAssignmentWrap">지난 과제 제출</button>
+          </div>
+
+          <section id="currentSubmissionPanel" class="current-submission-panel" role="tabpanel" aria-labelledby="currentSubmissionTab">
+            <div class="section-head">
+              <h2>도와줘요 쌤</h2>
+              <span id="checkedCount" class="badge">0개 선택</span>
+            </div>
+            <div id="problemGrid" class="check-grid"></div>
+            <label class="no-question-option">
+              <input id="noQuestion" type="checkbox" />
+              <span>
+                <strong>질문할 문제 없음</strong>
+                <small>질문할 문제가 없다면 꼭 체크해 주세요.</small>
+              </span>
+            </label>
+            <div class="photo-upload">
+              <strong>과제 사진·동영상 첨부</strong>
+              <div class="photo-actions">
+                <label class="photo-picker">
+                  사진·동영상 선택
+                  <input id="photoFiles" type="file" accept="image/*,video/*" multiple />
+                </label>
+                <label class="photo-picker camera">
+                  카메라로 사진 추가
+                  <input id="photoCamera" type="file" accept="image/*" capture="environment" />
+                </label>
+                <label class="photo-picker video-camera">
+                  동영상 촬영
+                  <input id="videoCamera" type="file" accept="video/*" capture="environment" />
+                </label>
+              </div>
+              <span class="muted">카메라로 찍은 사진도 계속 추가할 수 있습니다.</span>
+            </div>
+            <div id="photoList" class="photo-list"></div>
+            <button class="primary full" type="submit">오늘 과제 제출하기</button>
+            <p id="message" class="message"></p>
+          </section>
+
+          <section id="pastAssignmentWrap" class="past-assignment-panel" role="tabpanel" aria-labelledby="pastSubmissionTab" hidden>
+            <div class="section-head compact">
+              <h2>지난과제 제출</h2>
+            </div>
+            <label>
+              제출할 과제
+              <select id="pastAssignmentSelect"></select>
+            </label>
+            <section id="pastProblemWrap" class="past-problem-wrap" hidden>
+              <div class="section-head compact">
+                <h3>도와줘요 쌤</h3>
+                <span id="pastCheckedCount" class="badge">0개 선택</span>
+              </div>
+              <div id="pastProblemGrid" class="check-grid past-check-grid"></div>
+              <label class="no-question-option">
+                <input id="pastNoQuestion" type="checkbox" />
+                <span>
+                  <strong>질문할 문제 없음</strong>
+                  <small>질문할 문제가 없다면 꼭 체크해 주세요.</small>
+                </span>
+              </label>
+            </section>
+            <div class="photo-upload">
+              <strong>지난과제 사진·동영상 첨부 <small>(선택)</small></strong>
+              <div class="photo-actions">
+                <label class="photo-picker">
+                  사진·동영상 선택
+                  <input id="pastPhotoFiles" type="file" accept="image/*,video/*" multiple />
+                </label>
+                <label class="photo-picker camera">
+                  카메라로 사진 추가
+                  <input id="pastPhotoCamera" type="file" accept="image/*" capture="environment" />
+                </label>
+                <label class="photo-picker video-camera">
+                  동영상 촬영
+                  <input id="pastVideoCamera" type="file" accept="video/*" capture="environment" />
+                </label>
+              </div>
+              <span class="muted">질문할 문제를 체크했다면 사진 없이도 저장할 수 있습니다.</span>
+            </div>
+            <div id="pastPhotoList" class="photo-list"></div>
+            <button id="pastSubmitBtn" class="secondary full" type="button">지난과제 제출하기</button>
+            <p id="pastMessage" class="message"></p>
+          </section>
+        </form>
+      </section>
+      </section>
+
+      <section id="studentRecordsView" class="student-main-view" hidden>
+        <section class="panel student-records-panel">
+          <div class="student-records-head">
+            <div>
+              <p class="eyebrow">나의 학습 흐름</p>
+              <h2>내 기록</h2>
+            </div>
+          </div>
+          <nav class="student-record-tabs" aria-label="내 기록 메뉴">
+            <button class="student-record-tab is-active" type="button" data-record-section="overview" aria-selected="true">성적 분석</button>
+            <button class="student-record-tab" type="button" data-record-section="tests" aria-selected="false">성적 기록</button>
+            <button class="student-record-tab" type="button" data-record-section="attendance" aria-selected="false">출결</button>
+          </nav>
+          <section id="studentRecordOverview">
+            <div id="studentRecordSummary" class="student-record-summary"></div>
+            <section id="studentPastExamTrend" class="student-assessment-section student-past-exam-trend" hidden>
+              <div class="student-analysis-heading">
+                <div>
+                  <p class="eyebrow">기출시험</p>
+                  <h3>점수와 예상 등급컷</h3>
+                </div>
+                <span id="studentPastExamAverage" class="student-assessment-badge"></span>
+              </div>
+              <div id="studentPastExamTrendChart" class="student-score-trend-chart student-grade-trend-chart"></div>
+            </section>
+            <section id="studentClinicTrend" class="student-assessment-section student-clinic-trend" hidden>
+              <div class="student-analysis-heading">
+                <div>
+                  <p class="eyebrow">클리닉</p>
+                  <h3>내 점수와 반 평균</h3>
+                </div>
+                <span id="studentClinicAverage" class="student-assessment-badge"></span>
+              </div>
+              <div id="studentClinicTrendChart" class="student-score-trend-chart student-clinic-trend-chart"></div>
+            </section>
+            <section id="studentScoreTrend" class="student-score-trend" hidden>
+              <div class="student-analysis-heading">
+                <div>
+                  <p class="eyebrow">점수의 흐름</p>
+                  <h3>성적 변화 그래프</h3>
+                </div>
+                <button id="studentGraphMonthButton" class="student-month-trigger" type="button">이번 달 기록</button>
+              </div>
+              <div id="studentScoreTrendChart" class="student-score-trend-chart"></div>
+            </section>
+            <section id="studentAssessmentWeakness" class="student-assessment-weakness" hidden></section>
+            <section id="studentLearningAnalysis" class="student-learning-analysis" hidden></section>
+          </section>
+          <section id="studentRecordTests" hidden>
+            <div class="student-record-columns student-record-test-columns">
+              <section>
+                <h3>기출 테스트 기록</h3>
+                <div id="studentPastExamHistory" class="student-history-list"></div>
+              </section>
+              <section>
+                <h3>클리닉 기록</h3>
+                <div id="studentClinicHistory" class="student-history-list"></div>
+              </section>
+              <section>
+                <h3>테스트 누적 기록</h3>
+                <div id="studentTestHistory" class="student-history-list"></div>
+              </section>
+              <section>
+                <h3>보완학습 기록</h3>
+                <div id="studentRelearningHistory" class="student-history-list"></div>
+              </section>
+            </div>
+          </section>
+          <section id="studentRecordAttendance" hidden>
+            <section class="student-record-single-column">
+              <h3>출결 기록</h3>
+              <div id="studentAttendanceHistory" class="student-history-list"></div>
+            </section>
+          </section>
+          <p id="studentRecordsMessage" class="message"></p>
+        </section>
+      </section>
+
+      <nav class="student-main-tabs" aria-label="학생관리 메뉴">
+        <button class="student-main-tab is-active" type="button" data-view="home" aria-selected="true">홈</button>
+        <button class="student-main-tab" type="button" data-view="assignment" aria-selected="false">과제</button>
+        <button class="student-main-tab" type="button" data-view="videos" aria-selected="false">수업영상</button>
+        <button class="student-main-tab" type="button" data-view="materials" aria-selected="false">학습자료</button>
+        <button class="student-main-tab" type="button" data-view="records" aria-selected="false">내 기록</button>
+      </nav>
+    </main>
+
+    <section id="studentMaterialFullscreen" class="student-material-fullscreen" hidden aria-label="학습자료 전체화면">
+      <header class="student-material-fullscreen-head">
+        <strong id="studentMaterialViewerTitle">학습자료</strong>
+        <button id="studentMaterialClose" type="button" aria-label="학습자료 닫기" title="닫기">&times;</button>
+      </header>
+      <iframe id="studentMaterialFrame" title="학습자료 열람"></iframe>
+    </section>
+
+    <section id="studentExitConfirm" class="student-exit-confirm" hidden role="dialog" aria-modal="true" aria-labelledby="studentExitConfirmTitle">
+      <div class="student-exit-confirm-panel">
+        <strong id="studentExitConfirmTitle">학생관리 화면을 나가시겠습니까?</strong>
+        <p>계속 이용하려면 아래 버튼을 눌러 주세요.</p>
+        <div class="student-exit-confirm-actions">
+          <button id="studentExitStay" class="secondary" type="button">계속 보기</button>
+          <button id="studentExitLeave" class="ghost" type="button">나가기</button>
+        </div>
+      </div>
+    </section>
+
+    <script src="/student.js"></script>
+  </body>
+</html>
